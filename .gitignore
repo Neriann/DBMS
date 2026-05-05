@@ -68,6 +68,9 @@ vcpkg_installed/
 Testing/
 .cache/
 
+# IDE files
+.idea
+
 # macOS enviroment
 *.DS_Store
 
