@@ -1,10 +1,10 @@
 #include "core/Table.hpp"
-#include <b_star_plus_tree.h>
+#include "core/index_tree.hpp"
 #include <stdexcept>
 #include "not_implemented.h"
 
 struct Index {
-    BSP_tree<Value, RowID, ValueComparator> tree;
+    IndexTree<Value, RowID, ValueComparator> tree;
 };
 
 Table::Table(Schema schema) : schema_(std::move(schema)) {

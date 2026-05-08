@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "b_star_plus_tree.h"
+#include "index_tree.hpp"
 
 class Database {
 public:
@@ -54,5 +54,5 @@ public:
 private:
     std::string name_;
 
-    BSP_tree<std::string, std::unique_ptr<Table> > tables_;
+    IndexTree<std::string, std::unique_ptr<Table> > tables_;
 };
