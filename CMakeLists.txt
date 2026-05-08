@@ -13,6 +13,12 @@ set(DBMS_TREE_BP 2)
 set(DBMS_TREE_BS 3)
 set(DBMS_TREE_BSP 4)
 
+set(DBMS_ALLOC_GLOBAL_HEAP 1)
+set(DBMS_ALLOC_BOUNDARY_TAGS 2)
+set(DBMS_ALLOC_SORTED_LIST 3)
+set(DBMS_ALLOC_BUDDIES 4)
+set(DBMS_ALLOC_RB_TREE 5)
+
 set(DBMS_INDEX_TREE "BSP_tree" CACHE STRING "Index tree for the DBMS databases container")
 set_property(CACHE DBMS_INDEX_TREE PROPERTY STRINGS "B_tree" "BP_tree" "BS_tree" "BSP_tree")
 if (DBMS_INDEX_TREE STREQUAL "B_tree")
@@ -31,13 +37,34 @@ else ()
     message(FATAL_ERROR "DBMS_INDEX_TREE must be B_tree, BP_tree, BS_tree or BSP_tree, got '${DBMS_INDEX_TREE}'")
 endif ()
 
+set(DBMS_ALLOCATOR "red_black_tree" CACHE STRING "Allocator for the DBMS index tree")
+set_property(CACHE DBMS_ALLOCATOR PROPERTY STRINGS "global_heap" "boundary_tags" "sorted_list" "buddies_system" "red_black_tree")
+if (DBMS_ALLOCATOR STREQUAL "global_heap")
+    set(ALLOCATOR_LIB sys_prog_allctr_allctr_glbl_hp)
+    set(ALLOCATOR_NUM ${DBMS_ALLOC_GLOBAL_HEAP})
+elseif (DBMS_ALLOCATOR STREQUAL "boundary_tags")
+    set(ALLOCATOR_LIB sys_prog_allctr_allctr_bndr_tgs)
+    set(ALLOCATOR_NUM ${DBMS_ALLOC_BOUNDARY_TAGS})
+elseif (DBMS_ALLOCATOR STREQUAL "sorted_list")
+    set(ALLOCATOR_LIB sys_prog_allctr_allctr_srtd_lst)
+    set(ALLOCATOR_NUM ${DBMS_ALLOC_SORTED_LIST})
+elseif (DBMS_ALLOCATOR STREQUAL "buddies_system")
+    set(ALLOCATOR_LIB sys_prog_allctr_allctr_bdds_sstm)
+    set(ALLOCATOR_NUM ${DBMS_ALLOC_BUDDIES})
+elseif (DBMS_ALLOCATOR STREQUAL "red_black_tree")
+    set(ALLOCATOR_LIB sys_prog_allctr_allctr_rb_tr)
+    set(ALLOCATOR_NUM ${DBMS_ALLOC_RB_TREE})
+else ()
+    message(FATAL_ERROR "DBMS_ALLOCATOR must be global_heap, boundary_tags, sorted_list, buddies_system or red_black_tree, got '${DBMS_ALLOCATOR}'")
+endif ()
+
 add_subdirectory(libs/json)
 
 set(CROW_USE_BOOST ON)
 add_subdirectory(libs/crow)
 
 add_subdirectory(libs/sysprog/common)
-add_subdirectory(libs/sysprog/allocator/allocator)
+add_subdirectory(libs/sysprog/allocator)
 add_subdirectory(libs/sysprog/associative_container)
 
 # Bison & Flex
@@ -66,6 +93,7 @@ set(CORE_INCLUDE_DIRS
 
 set(CORE_LIBS
         ${INDEX_TREE_LIB}
+        ${ALLOCATOR_LIB}
         sys_prog_cmmn
         Boost::container
         nlohmann_json::nlohmann_json)
@@ -75,7 +103,13 @@ set(CORE_COMPILE_DEFS
         DBMS_TREE_BP=${DBMS_TREE_BP}
         DBMS_TREE_BS=${DBMS_TREE_BS}
         DBMS_TREE_BSP=${DBMS_TREE_BSP}
-        DBMS_INDEX_TREE=${INDEX_TREE_NUM})
+        DBMS_ALLOC_GLOBAL_HEAP=${DBMS_ALLOC_GLOBAL_HEAP}
+        DBMS_ALLOC_BOUNDARY_TAGS=${DBMS_ALLOC_BOUNDARY_TAGS}
+        DBMS_ALLOC_SORTED_LIST=${DBMS_ALLOC_SORTED_LIST}
+        DBMS_ALLOC_BUDDIES=${DBMS_ALLOC_BUDDIES}
+        DBMS_ALLOC_RB_TREE=${DBMS_ALLOC_RB_TREE}
+        DBMS_INDEX_TREE=${INDEX_TREE_NUM}
+        DBMS_ALLOCATOR=${ALLOCATOR_NUM})
 
 # CLI
 add_executable(dbms src/main.cpp ${CORE_SOURCES})

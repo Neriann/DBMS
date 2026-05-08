@@ -17,6 +17,23 @@ using DbTree = BS_tree<std::string, std::unique_ptr<Database> >;
 using DbTree = BSP_tree<std::string, std::unique_ptr<Database> >;
 #endif
 
+#if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
+#include <allocator_global_heap.h>
+using DbAllocator = allocator_global_heap;
+#elif DBMS_ALLOCATOR == DBMS_ALLOC_BOUNDARY_TAGS
+#include <allocator_boundary_tags.h>
+using DbAllocator = allocator_boundary_tags;
+#elif DBMS_ALLOCATOR == DBMS_ALLOC_BUDDIES
+#include <allocator_buddies_system.h>
+using DbAllocator = allocator_buddies_system;
+#elif DBMS_ALLOCATOR == DBMS_ALLOC_SORTED_LIST
+#include <allocator_sorted_list.h>
+using DbAllocator = allocator_sorted_list;
+#else
+#include <allocator_red_black_tree.h>
+using DbAllocator = allocator_red_black_tree;
+#endif
+
 class DBMS {
 public:
     DBMS();
@@ -76,6 +93,10 @@ public:
     const Database *current_database() const noexcept;
 
 private:
+    // TODO: remove hardcoded size;
+    static constexpr size_t databases_pool_size_ = 1u << 20; // 1 MiB
+
+    DbAllocator databases_alloc_;
     DbTree databases_;
 
     Database *current_db_ = nullptr;

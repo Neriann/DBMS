@@ -1,7 +1,14 @@
 #include "core/DBMS.hpp"
 #include "not_implemented.h"
 
-DBMS::DBMS() = default;
+DBMS::DBMS()
+#if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
+    : databases_alloc_(),
+#else
+    : databases_alloc_(databases_pool_size_),
+#endif
+      databases_(pp_allocator<DbTree::value_type>(&databases_alloc_))
+{}
 
 void DBMS::create_database(const std::string &/*db_name*/) {
     throw not_implemented("void DBMS::create_database(const std::string &)", "is not implemented");
