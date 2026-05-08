@@ -1,5 +1,5 @@
 %{
-#include "query/Scanner.hpp"
+#include "query/scanner.hpp"
 #include "not_implemented.h"
 #include <algorithm>
 #include <stdexcept>
