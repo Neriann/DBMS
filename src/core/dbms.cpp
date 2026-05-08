@@ -5,7 +5,7 @@ DBMS::DBMS()
 #if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
     : databases_alloc_(),
 #else
-    : databases_alloc_(databases_pool_size_),
+    : databases_alloc_(1u << 20), // 1 MiB for now
 #endif
       databases_(pp_allocator<DbTree::value_type>(&databases_alloc_))
 {}

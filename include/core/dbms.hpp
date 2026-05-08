@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-using DbTree = IndexTree<std::string, std::unique_ptr<Database>>;
+using DbTree = IndexTree<std::string, std::unique_ptr<Database> >;
 using DbAllocator = Allocator;
 
 class DBMS {
@@ -66,9 +66,6 @@ public:
     const Database *current_database() const noexcept;
 
 private:
-    // TODO: remove hardcoded size;
-    static constexpr size_t databases_pool_size_ = 1u << 20; // 1 MiB
-
     DbAllocator databases_alloc_;
     DbTree databases_;
 
