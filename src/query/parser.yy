@@ -7,7 +7,7 @@
 %define parse.error detailed
 
 %code requires {
-    #include "query/AST.hpp"
+    #include "query/ast.hpp"
 
     class Scanner;
 }
