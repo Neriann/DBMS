@@ -1,4 +1,4 @@
-#include "core/DBMS.hpp"
+#include "core/dbms.hpp"
 #include "not_implemented.h"
 
 DBMS::DBMS()

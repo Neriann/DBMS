@@ -1,4 +1,4 @@
-#include "core/Schema.hpp"
+#include "core/schema.hpp"
 #include "not_implemented.h"
 
 int find(const Schema &/*schema*/, const std::string &/*name*/) {

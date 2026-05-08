@@ -1,8 +1,8 @@
-#include "core/DBMS.hpp"
-#include "query/Scanner.hpp"
+#include "core/dbms.hpp"
+#include "query/scanner.hpp"
 #include "parser.hpp"
-#include "query/Executor.hpp"
-#include "storage/StorageManager.hpp"
+#include "query/executor.hpp"
+#include "storage/storage_manager.hpp"
 
 #include <fstream>
 #include <iostream>

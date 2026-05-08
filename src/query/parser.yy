@@ -18,7 +18,7 @@
 %parse-param { std::vector<Statement> &result }
 
 %code {
-    #include "query/Scanner.hpp"
+    #include "query/scanner.hpp"
     #include "not_implemented.h"
 
     // Bison calls yylex(scanner), and the call is forwarded to the real C++ scanner method.

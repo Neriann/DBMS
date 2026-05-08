@@ -1,4 +1,4 @@
-#include "core/Database.hpp"
+#include "core/database.hpp"
 #include "not_implemented.h"
 
 Database::Database(std::string name) : name_(std::move(name)) {

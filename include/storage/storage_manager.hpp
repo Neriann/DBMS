@@ -1,5 +1,5 @@
 #pragma once
-#include "../core/DBMS.hpp"
+#include "../core/dbms.hpp"
 #include <filesystem>
 #include <string>
 

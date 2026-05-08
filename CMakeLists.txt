@@ -76,14 +76,14 @@ BISON_TARGET(Parser src/query/parser.yy ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
 ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
 set(CORE_SOURCES
-        src/core/Value.cpp
-        src/core/Schema.cpp
-        src/core/Table.cpp
-        src/core/Database.cpp
-        src/core/DBMS.cpp
-        src/query/AST.cpp
-        src/query/Executor.cpp
-        src/storage/StorageManager.cpp
+        src/core/value.cpp
+        src/core/schema.cpp
+        src/core/table.cpp
+        src/core/database.cpp
+        src/core/dbms.cpp
+        src/query/ast.cpp
+        src/query/executor.cpp
+        src/storage/storage_manager.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )

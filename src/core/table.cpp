@@ -1,4 +1,4 @@
-#include "core/Table.hpp"
+#include "core/table.hpp"
 #include "core/index_tree.hpp"
 #include <stdexcept>
 #include "not_implemented.h"

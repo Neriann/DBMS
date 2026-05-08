@@ -1,5 +1,5 @@
 #pragma once
-#include "Table.hpp"
+#include "table.hpp"
 #include <memory>
 #include <string>
 

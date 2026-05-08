@@ -1,6 +1,6 @@
 #pragma once
-#include "Schema.hpp"
-#include "Row.hpp"
+#include "schema.hpp"
+#include "row.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>

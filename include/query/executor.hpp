@@ -1,6 +1,6 @@
 #pragma once
-#include "AST.hpp"
-#include "../core/DBMS.hpp"
+#include "ast.hpp"
+#include "../core/dbms.hpp"
 #include <string>
 
 

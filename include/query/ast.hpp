@@ -1,7 +1,7 @@
 #pragma once
-#include "../core/Schema.hpp"
-#include "../core/Row.hpp"
-#include "../core/Value.hpp"
+#include "../core/schema.hpp"
+#include "../core/row.hpp"
+#include "../core/value.hpp"
 #include <memory>
 #include <string>
 #include <vector>

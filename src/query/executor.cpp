@@ -1,4 +1,4 @@
-#include "query/Executor.hpp"
+#include "query/executor.hpp"
 #include "not_implemented.h"
 
 Executor::Executor(DBMS &dbms) : dbms_(dbms) {

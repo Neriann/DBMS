@@ -1,4 +1,4 @@
-#include "core/Value.hpp"
+#include "core/value.hpp"
 #include "not_implemented.h"
 
 bool ValueComparator::operator()(const Value &/*a*/, const Value &/*b*/) const {
