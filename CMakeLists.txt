@@ -8,6 +8,29 @@ find_package(FLEX REQUIRED)
 find_package(BISON REQUIRED)
 find_package(Boost REQUIRED COMPONENTS container date_time)
 
+set(DBMS_TREE_B 1)
+set(DBMS_TREE_BP 2)
+set(DBMS_TREE_BS 3)
+set(DBMS_TREE_BSP 4)
+
+set(DBMS_INDEX_TREE "BSP_tree" CACHE STRING "Index tree for the DBMS databases container")
+set_property(CACHE DBMS_INDEX_TREE PROPERTY STRINGS "B_tree" "BP_tree" "BS_tree" "BSP_tree")
+if (DBMS_INDEX_TREE STREQUAL "B_tree")
+    set(INDEX_TREE_LIB sys_prog_assctv_cntnr_indxng_tr_b_tr)
+    set(INDEX_TREE_NUM ${DBMS_TREE_B})
+elseif (DBMS_INDEX_TREE STREQUAL "BP_tree")
+    set(INDEX_TREE_LIB sys_prog_assctv_cntnr_indxng_tr_b_pls_tr)
+    set(INDEX_TREE_NUM ${DBMS_TREE_BP})
+elseif (DBMS_INDEX_TREE STREQUAL "BS_tree")
+    set(INDEX_TREE_LIB sys_prog_assctv_cntnr_indxng_tr_b_str_tr)
+    set(INDEX_TREE_NUM ${DBMS_TREE_BS})
+elseif (DBMS_INDEX_TREE STREQUAL "BSP_tree")
+    set(INDEX_TREE_LIB sys_prog_assctv_cntnr_indxng_tr_b_str_pls_tr)
+    set(INDEX_TREE_NUM ${DBMS_TREE_BSP})
+else ()
+    message(FATAL_ERROR "DBMS_INDEX_TREE must be B_tree, BP_tree, BS_tree or BSP_tree, got '${DBMS_INDEX_TREE}'")
+endif ()
+
 add_subdirectory(libs/json)
 
 set(CROW_USE_BOOST ON)
@@ -42,20 +65,29 @@ set(CORE_INCLUDE_DIRS
         ${FLEX_INCLUDE_DIRS})
 
 set(CORE_LIBS
-        sys_prog_assctv_cntnr_indxng_tr_b_str_pls_tr
+        ${INDEX_TREE_LIB}
         sys_prog_cmmn
         Boost::container
         nlohmann_json::nlohmann_json)
+
+set(CORE_COMPILE_DEFS
+        DBMS_TREE_B=${DBMS_TREE_B}
+        DBMS_TREE_BP=${DBMS_TREE_BP}
+        DBMS_TREE_BS=${DBMS_TREE_BS}
+        DBMS_TREE_BSP=${DBMS_TREE_BSP}
+        DBMS_INDEX_TREE=${INDEX_TREE_NUM})
 
 # CLI
 add_executable(dbms src/main.cpp ${CORE_SOURCES})
 target_include_directories(dbms PRIVATE ${CORE_INCLUDE_DIRS})
 target_link_libraries(dbms PRIVATE ${CORE_LIBS})
+target_compile_definitions(dbms PRIVATE ${CORE_COMPILE_DEFS})
 
 # HTTP server
 add_executable(dbms_server src/server.cpp ${CORE_SOURCES})
 target_include_directories(dbms_server PRIVATE ${CORE_INCLUDE_DIRS})
 target_link_libraries(dbms_server PRIVATE ${CORE_LIBS} Crow::Crow)
+target_compile_definitions(dbms_server PRIVATE ${CORE_COMPILE_DEFS})
 
 # HTTP client
 add_executable(dbms_client src/client.cpp)

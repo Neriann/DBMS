@@ -1,8 +1,21 @@
 #pragma once
 #include "Database.hpp"
-#include <b_star_plus_tree.h>
 #include <memory>
 #include <string>
+
+#if DBMS_INDEX_TREE == DBMS_TREE_B
+#include <b_tree.h>
+using DbTree = B_tree<std::string, std::unique_ptr<Database> >;
+#elif DBMS_INDEX_TREE == DBMS_TREE_BP
+#include <b_plus_tree.h>
+using DbTree = BP_tree<std::string, std::unique_ptr<Database> >;
+#elif DBMS_INDEX_TREE == DBMS_TREE_BS
+#include <b_star_tree.h>
+using DbTree = BS_tree<std::string, std::unique_ptr<Database> >;
+#else
+#include <b_star_plus_tree.h>
+using DbTree = BSP_tree<std::string, std::unique_ptr<Database> >;
+#endif
 
 class DBMS {
 public:
@@ -63,7 +76,7 @@ public:
     const Database *current_database() const noexcept;
 
 private:
-    BSP_tree<std::string, std::unique_ptr<Database> > databases_;
+    DbTree databases_;
 
     Database *current_db_ = nullptr;
 };
