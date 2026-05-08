@@ -36,6 +36,7 @@ elseif (DBMS_INDEX_TREE STREQUAL "BSP_tree")
 else ()
     message(FATAL_ERROR "DBMS_INDEX_TREE must be B_tree, BP_tree, BS_tree or BSP_tree, got '${DBMS_INDEX_TREE}'")
 endif ()
+message(STATUS "DBMS index tree: ${DBMS_INDEX_TREE}")
 
 set(DBMS_ALLOCATOR "red_black_tree" CACHE STRING "Allocator for the DBMS index tree")
 set_property(CACHE DBMS_ALLOCATOR PROPERTY STRINGS "global_heap" "boundary_tags" "sorted_list" "buddies_system" "red_black_tree")
@@ -57,6 +58,7 @@ elseif (DBMS_ALLOCATOR STREQUAL "red_black_tree")
 else ()
     message(FATAL_ERROR "DBMS_ALLOCATOR must be global_heap, boundary_tags, sorted_list, buddies_system or red_black_tree, got '${DBMS_ALLOCATOR}'")
 endif ()
+message(STATUS "DBMS allocator: ${DBMS_ALLOCATOR}")
 
 add_subdirectory(libs/json)
 
