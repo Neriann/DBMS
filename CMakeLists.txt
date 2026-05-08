@@ -4,8 +4,8 @@ project(DBMS LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(FLEX REQUIRED)
-find_package(BISON REQUIRED)
+find_package(FLEX 2.6 REQUIRED)
+find_package(BISON 3.0 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS container date_time)
 
 set(DBMS_TREE_B 1)
