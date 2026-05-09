@@ -8,13 +8,10 @@ enum class ColumnType : uint8_t {
     STRING
 };
 
-/**
- * @note: every constraint have its own bit.
- */
 enum ConstraintFlags : uint8_t {
-    NONE = 0,
-    NOT_NULL = 1,
-    INDEXED = 1 << 1,
+    NONE,
+    NOT_NULL,
+    INDEXED
 };
 
 struct Column {
