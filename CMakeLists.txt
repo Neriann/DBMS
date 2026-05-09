@@ -38,7 +38,7 @@ else ()
 endif ()
 message(STATUS "DBMS index tree: ${DBMS_INDEX_TREE}")
 
-set(DBMS_ALLOCATOR "red_black_tree" CACHE STRING "Allocator for the DBMS index tree")
+set(DBMS_ALLOCATOR "global_heap" CACHE STRING "Allocator for the DBMS index tree")
 set_property(CACHE DBMS_ALLOCATOR PROPERTY STRINGS "global_heap" "boundary_tags" "sorted_list" "buddies_system" "red_black_tree")
 if (DBMS_ALLOCATOR STREQUAL "global_heap")
     set(ALLOCATOR_LIB sys_prog_allctr_allctr_glbl_hp)
