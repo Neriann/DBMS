@@ -3,12 +3,12 @@
 #include <string>
 #include <vector>
 
-enum class ColumnType : uint8_t {
+enum class ColumnType : std::uint8_t {
     INT,
     STRING
 };
 
-enum ConstraintFlags : uint8_t {
+enum ConstraintFlags : std::uint8_t {
     NONE,
     NOT_NULL,
     INDEXED
@@ -17,7 +17,7 @@ enum ConstraintFlags : uint8_t {
 struct Column {
     std::string name;
     ColumnType type;
-    uint8_t constraints = NONE;
+    std::uint8_t constraints = NONE;
 
     /**
      *
