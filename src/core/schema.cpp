@@ -1,8 +1,11 @@
 #include "core/schema.hpp"
-#include "not_implemented.h"
 
-int find(const Schema &/*schema*/, const std::string &/*name*/) {
-    throw not_implemented("int find(const Schema &, const std::string &)", "is not implemented");
+int find(const Schema &schema, const std::string &name) {
+    for (auto i = 0; i < schema.size(); ++i) {
+        if (schema[i].name == name) return i;
+    }
+
+    return -1;
 }
 
 bool Column::is_not_null() const noexcept {

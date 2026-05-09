@@ -1,5 +1,5 @@
 #include "core/dbms.hpp"
-#include "not_implemented.h"
+#include <stdexcept>
 
 DBMS::DBMS()
 #if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
@@ -7,31 +7,49 @@ DBMS::DBMS()
 #else
     : databases_alloc_(1u << 20), // 1 MiB for now
 #endif
-      databases_(pp_allocator<DbTree::value_type>(&databases_alloc_))
-{}
-
-void DBMS::create_database(const std::string &/*db_name*/) {
-    throw not_implemented("void DBMS::create_database(const std::string &)", "is not implemented");
+      databases_(pp_allocator<DbTree::value_type>(&databases_alloc_)) {
 }
 
-void DBMS::drop_database(const std::string &/*db_name*/) {
-    throw not_implemented("void DBMS::drop_database(const std::string &)", "is not implemented");
+void DBMS::create_database(const std::string &db_name) {
+    if (databases_.contains(db_name)) {
+        throw std::runtime_error("Database '" + db_name + "' already exists");
+    }
+
+    databases_.insert({db_name, std::make_unique<Database>(db_name)});
 }
 
-Database &DBMS::get_database(const std::string &/*db_name*/) {
-    throw not_implemented("Database &DBMS::get_database(const std::string &)", "is not implemented");
+void DBMS::drop_database(const std::string &db_name) {
+    const auto it = databases_.find(db_name);
+
+    if (it == databases_.end()) {
+        throw std::out_of_range("Database '" + db_name + "' does not exist");
+    }
+
+    if (current_db_ == it->second.get()) {
+        current_db_ = nullptr;
+    }
+    databases_.erase(it);
 }
 
-const Database &DBMS::get_database(const std::string &/*db_name*/) const {
-    throw not_implemented("const Database &DBMS::get_database(const std::string &) const", "is not implemented");
+Database &DBMS::get_database(const std::string &db_name) {
+    return *databases_.at(db_name);
 }
 
-bool DBMS::has_database(const std::string &/*db_name*/) const {
-    throw not_implemented("bool DBMS::has_database(const std::string &) const", "is not implemented");
+const Database &DBMS::get_database(const std::string &db_name) const {
+    return *databases_.at(db_name);
 }
 
-void DBMS::use(const std::string &/*db_name*/) {
-    throw not_implemented("void DBMS::use(const std::string &)", "is not implemented");
+bool DBMS::has_database(const std::string &db_name) const {
+    return databases_.contains(db_name);
+}
+
+void DBMS::use(const std::string &db_name) {
+    const auto it = databases_.find(db_name);
+
+    if (it == databases_.end()) {
+        throw std::out_of_range("Database '" + db_name + "' does not exist");
+    }
+    current_db_ = it->second.get();
 }
 
 Database *DBMS::current_database() noexcept {

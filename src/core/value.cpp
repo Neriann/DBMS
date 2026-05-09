@@ -1,6 +1,15 @@
 #include "core/value.hpp"
-#include "not_implemented.h"
 
-bool ValueComparator::operator()(const Value &/*a*/, const Value &/*b*/) const {
-    throw not_implemented("bool ValueComparator::operator()(const Value &, const Value &) const", "is not implemented");
+bool ValueComparator::operator()(const Value &a, const Value &b) const {
+    if (a.index() != b.index()) {
+        return a.index() < b.index();
+    }
+    if (std::holds_alternative<int>(a)) {
+        return std::get<int>(a) < std::get<int>(b);
+    }
+    if (std::holds_alternative<std::string>(a)) {
+        return std::get<std::string>(a) < std::get<std::string>(b);
+    }
+
+    return false;
 }
