@@ -8,6 +8,7 @@ using DbTree = IndexTree<std::string, std::shared_ptr<Database> >;
 using DbAllocator = Allocator;
 
 class DBMS {
+    friend class StorageManager;
 public:
     DBMS();
 
