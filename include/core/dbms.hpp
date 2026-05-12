@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-using DbTree = IndexTree<std::string, std::unique_ptr<Database> >;
+using DbTree = IndexTree<std::string, std::shared_ptr<Database> >;
 using DbAllocator = Allocator;
 
 class DBMS {

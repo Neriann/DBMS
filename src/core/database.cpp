@@ -13,7 +13,7 @@ void Database::create_table(const std::string &table_name, Schema schema) {
         throw std::runtime_error("Table '" + table_name + "' already exists");
     }
 
-    tables_.insert({table_name, std::make_unique<Table>(std::move(schema))});
+    tables_.insert({table_name, std::make_shared<Table>(std::move(schema))});
 }
 
 void Database::drop_table(const std::string &table_name) {
