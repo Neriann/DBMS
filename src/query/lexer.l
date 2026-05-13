@@ -1,8 +1,86 @@
 %{
 #include "query/scanner.hpp"
-#include "not_implemented.h"
-#include <algorithm>
+
+#include <cctype>
+#include <cerrno>
+#include <cstdlib>
+#include <limits>
 #include <stdexcept>
+#include <string>
+#include <unordered_map>
+
+static bool is_all_upper_or_underscore(const std::string &text) {
+    for (const unsigned char ch : text) {
+        if (std::isalpha(ch) && !std::isupper(ch)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool is_all_lower_or_underscore(const std::string &text) {
+    for (const unsigned char ch : text) {
+        if (std::isalpha(ch) && !std::islower(ch)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static std::string to_lower(std::string text) {
+    for (char &ch : text) {
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+    return text;
+}
+
+static std::string unquote_string(const char *text, std::size_t len) {
+    std::string result;
+    result.reserve(len > 1 ? len - 2 : 0);
+    for (std::size_t i = 1; i + 1 < len; ++i) {
+        if (text[i] != '\\') {
+            result.push_back(text[i]);
+            continue;
+        }
+
+        if (i + 2 >= len) {
+            throw std::runtime_error("invalid string literal escape");
+        }
+
+        const char escaped = text[++i];
+        switch (escaped) {
+            case '"':
+            case '\\':
+                result.push_back(escaped);
+                break;
+            case 'n':
+                result.push_back('\n');
+                break;
+            case 't':
+                result.push_back('\t');
+                break;
+            case 'r':
+                result.push_back('\r');
+                break;
+            default:
+                throw std::runtime_error(std::string("unsupported escape sequence: \\") + escaped);
+        }
+    }
+    return result;
+}
+
+static int parse_int_literal(const char *text) {
+    errno = 0;
+    char *end = nullptr;
+    const long value = std::strtol(text, &end, 10);
+
+    if (errno == ERANGE || *end != '\0' ||
+        value > std::numeric_limits<int>::max()) {
+        throw std::runtime_error("integer literal is out of range: " + std::string(text));
+    }
+
+    return static_cast<int>(value);
+}
 
 #undef  YY_DECL
 #define YY_DECL yy::Parser::symbol_type Scanner::next_token()
