@@ -21,27 +21,27 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 
 %%
 
-{blank}             { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-{comment}           { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-{string}            { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-{number}            { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
+{blank}             { /* skip */ }
+{comment}           { /* skip */ }
+{string}            { return yy::Parser::make_STRING_LIT(unquote_string(yytext, yyleng)); }
+{number}            { return yy::Parser::make_INT_LIT(parse_int_literal(yytext)); }
 {identifier}        { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
 
-"=="    { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"!="    { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"<="    { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-">="    { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"<"     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-">"     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"="     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"("     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-")"     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-","     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-";"     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"."     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-"*"     { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
+"=="    { return yy::Parser::make_EQ(); }
+"!="    { return yy::Parser::make_NEQ(); }
+"<="    { return yy::Parser::make_LEQ(); }
+">="    { return yy::Parser::make_GEQ(); }
+"<"     { return yy::Parser::make_LT(); }
+">"     { return yy::Parser::make_GT(); }
+"="     { return yy::Parser::make_ASSIGN(); }
+"("     { return yy::Parser::make_LPAREN(); }
+")"     { return yy::Parser::make_RPAREN(); }
+","     { return yy::Parser::make_COMMA(); }
+";"     { return yy::Parser::make_SEMICOLON(); }
+"."     { return yy::Parser::make_DOT(); }
+"*"     { return yy::Parser::make_STAR(); }
 
-<<EOF>> { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
-.       { throw not_implemented("yy::Parser::symbol_type Scanner::next_token()", "is not implemented"); }
+<<EOF>> { return yy::Parser::make_YYEOF(); }
+.       { throw std::runtime_error("invalid character: " + std::string(yytext, yyleng)); }
 
 %%
