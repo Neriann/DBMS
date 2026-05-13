@@ -19,9 +19,7 @@
 
 %code {
     #include "query/scanner.hpp"
-    #include "not_implemented.h"
 
-    // Bison calls yylex(scanner), and the call is forwarded to the real C++ scanner method.
     static yy::Parser::symbol_type yylex(Scanner &scanner) {
         return scanner.next_token();
     }
@@ -47,6 +45,7 @@
 %token KW_SELECT
 %token KW_WHERE
 %token KW_AS
+%token KW_NOT
 %token KW_NOT_NULL
 %token KW_INDEXED
 %token KW_AND
@@ -76,6 +75,7 @@
 %type <Statement> statement
 
 %type <Expr> expr
+%type <Value> literal_value
 
 %type <Condition> condition
 %type <Condition> or_cond
@@ -104,6 +104,7 @@
 
 %type <SelectColumn> select_col
 %type <std::vector<SelectColumn>> select_cols
+%type <std::vector<SelectColumn>> select_list
 
 %type <std::optional<Condition>> opt_where
 
@@ -162,19 +163,21 @@ statement:
             throw not_implemented("yy::Parser::parse()", "is not implemented");
         }
 
-    | KW_SELECT select_cols KW_FROM table_ref opt_where SEMICOLON
+    | KW_SELECT select_list KW_FROM table_ref opt_where SEMICOLON
         {
             throw not_implemented("yy::Parser::parse()", "is not implemented");
         }
     ;
-/* endregion Statements */
-
-/* region Names */
 
 ident:
       IDENT
         {
             $$ = std::move($1);
+        }
+
+    | KW_VALUE
+        {
+            $$ = "value";
         }
     ;
 
@@ -272,12 +275,12 @@ value_tuple:
     ;
 
 value_list:
-      expr
+      literal_value
         {
             throw not_implemented("yy::Parser::parse()", "is not implemented");
         }
 
-    | value_list COMMA expr
+    | value_list COMMA literal_value
         {
             throw not_implemented("yy::Parser::parse()", "is not implemented");
         }
@@ -323,6 +326,18 @@ select_col:
         }
 
     | ident KW_AS ident
+        {
+            throw not_implemented("yy::Parser::parse()", "is not implemented");
+        }
+    ;
+
+select_list:
+      select_cols
+        {
+            throw not_implemented("yy::Parser::parse()", "is not implemented");
+        }
+
+    | LPAREN select_cols RPAREN
         {
             throw not_implemented("yy::Parser::parse()", "is not implemented");
         }
@@ -426,26 +441,34 @@ cmp_op:
     ;
 
 expr:
+      literal_value
+        {
+            $$ = Expr{ExprKind::Literal, std::move($1), ""};
+        }
+
+    | ident
+        {
+            $$ = Expr{ExprKind::Column, nullptr, std::move($1)};
+        }
+    ;
+
+literal_value:
       INT_LIT
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Value{$1};
         }
 
     | STRING_LIT
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Value{std::move($1)};
         }
 
     | NULL_LIT
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | IDENT
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Value{nullptr};
         }
     ;
+
 %%
 
 namespace yy {
