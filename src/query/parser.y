@@ -120,52 +120,52 @@ program:
 statement:
       KW_CREATE KW_DATABASE ident SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = CreateDatabaseStmt{std::move($3)};
         }
 
     | KW_DROP KW_DATABASE ident SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = DropDatabaseStmt{std::move($3)};
         }
 
     | KW_USE ident SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = UseStmt{std::move($2)};
         }
 
     | KW_CREATE KW_TABLE table_ref LPAREN column_defs RPAREN SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = CreateTableStmt{std::move($3.first), std::move($3.second), std::move($5)};
         }
 
     | KW_DROP KW_TABLE table_ref SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = DropTableStmt{std::move($3.first), std::move($3.second)};
         }
 
     | KW_INSERT KW_INTO table_ref LPAREN ident_list RPAREN KW_VALUE value_tuples SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = InsertStmt{std::move($3.first), std::move($3.second), std::move($5), std::move($8)};
         }
 
     | KW_UPDATE table_ref KW_SET assignment_list opt_where SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = UpdateStmt{std::move($2.first), std::move($2.second), std::move($4), std::move($5)};
         }
 
     | KW_DELETE KW_FROM table_ref opt_where SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = DeleteStmt{std::move($3.first), std::move($3.second), std::move($4)};
         }
 
     | KW_SELECT STAR KW_FROM table_ref opt_where SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = SelectStmt{std::move($4.first), std::move($4.second), true, {}, std::move($5)};
         }
 
     | KW_SELECT select_list KW_FROM table_ref opt_where SEMICOLON
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = SelectStmt{std::move($4.first), std::move($4.second), false, std::move($2), std::move($5)};
         }
     ;
 
@@ -184,67 +184,73 @@ ident:
 table_ref:
       ident DOT ident
         {
-            $$ = { std::move($1), std::move($3) };
+            $$ = {std::move($1), std::move($3)};
         }
 
     | ident
         {
-            $$ = { "", std::move($1) };
+            $$ = {"", std::move($1)};
         }
     ;
 
 column_defs:
       column_def
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Schema{std::move($1)};
         }
 
     | column_defs COMMA column_def
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $1.push_back(std::move($3));
+            $$ = std::move($1);
         }
     ;
 
 column_def:
       ident col_type constraints
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Column{std::move($1), $2, $3};
         }
     ;
 
 col_type:
       KW_INT
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = ColumnType::INT;
         }
 
     | KW_STRING
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = ColumnType::STRING;
         }
     ;
 
 constraints:
       %empty
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = NONE;
         }
 
     | constraints KW_NOT_NULL
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = static_cast<std::uint8_t>($1 | NOT_NULL);
+        }
+
+    | constraints KW_NOT NULL_LIT
+        {
+            $$ = static_cast<std::uint8_t>($1 | NOT_NULL);
         }
 
     | constraints KW_INDEXED
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = static_cast<std::uint8_t>($1 | INDEXED);
         }
     ;
 
 ident_list:
       ident
         {
-            $$ = std::vector<std::string>{ std::move($1) };
+            $$ = std::vector<std::string>{std::move($1)};
         }
 
     | ident_list COMMA ident
@@ -257,7 +263,7 @@ ident_list:
 value_tuples:
       value_tuple
         {
-            $$ = std::vector<Row>{ std::move($1) };
+            $$ = std::vector<Row>{std::move($1)};
         }
 
     | value_tuples COMMA value_tuple
@@ -277,19 +283,20 @@ value_tuple:
 value_list:
       literal_value
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = Row{std::move($1)};
         }
 
     | value_list COMMA literal_value
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $1.push_back(std::move($3));
+            $$ = std::move($1);
         }
     ;
 
 assignment_list:
       assignment
         {
-            $$ = std::vector<std::pair<std::string, Expr>>{ std::move($1) };
+            $$ = std::vector<std::pair<std::string, Expr>>{std::move($1)};
         }
 
     | assignment_list COMMA assignment
@@ -302,14 +309,14 @@ assignment_list:
 assignment:
       ident ASSIGN expr
         {
-            $$ = { std::move($1), std::move($3) };
+            $$ = {std::move($1), std::move($3)};
         }
     ;
 
 select_cols:
       select_col
         {
-            $$ = std::vector<SelectColumn>{ std::move($1) };
+            $$ = std::vector<SelectColumn>{std::move($1)};
         }
 
     | select_cols COMMA select_col
@@ -322,24 +329,24 @@ select_cols:
 select_col:
       ident
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = SelectColumn{std::move($1), ""};
         }
 
     | ident KW_AS ident
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = SelectColumn{std::move($1), std::move($3)};
         }
     ;
 
 select_list:
       select_cols
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = std::move($1);
         }
 
     | LPAREN select_cols RPAREN
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            $$ = std::move($2);
         }
     ;
 
@@ -370,7 +377,11 @@ or_cond:
 
     | or_cond KW_OR and_cond
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            Condition cond;
+            cond.kind = ConditionKind::Or;
+            cond.left = std::make_shared<Condition>(std::move($1));
+            cond.right = std::make_shared<Condition>(std::move($3));
+            $$ = std::move(cond);
         }
     ;
 
@@ -382,7 +393,11 @@ and_cond:
 
     | and_cond KW_AND primary_cond
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            Condition cond;
+            cond.kind = ConditionKind::And;
+            cond.left = std::make_shared<Condition>(std::move($1));
+            cond.right = std::make_shared<Condition>(std::move($3));
+            $$ = std::move(cond);
         }
     ;
 
@@ -394,50 +409,36 @@ primary_cond:
 
     | expr KW_BETWEEN expr KW_AND expr
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            Condition cond;
+            cond.kind = ConditionKind::Between;
+            cond.between = BetweenPredicate{std::move($1), std::move($3), std::move($5)};
+            $$ = std::move(cond);
         }
 
     | expr KW_LIKE STRING_LIT
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            Condition cond;
+            cond.kind = ConditionKind::Like;
+            cond.like = LikePredicate{std::move($1), std::move($3)};
+            $$ = std::move(cond);
         }
 
     | expr cmp_op expr
         {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
+            Condition cond;
+            cond.kind = ConditionKind::Simple;
+            cond.predicate = Predicate{std::move($1), $2, std::move($3)};
+            $$ = std::move(cond);
         }
     ;
 
 cmp_op:
-      EQ
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | NEQ
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | LT
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | GT
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | LEQ
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
-
-    | GEQ
-        {
-            throw not_implemented("yy::Parser::parse()", "is not implemented");
-        }
+      EQ { $$ = CmpOp::EQ; }
+    | NEQ { $$ = CmpOp::NEQ; }
+    | LT { $$ = CmpOp::LT; }
+    | GT { $$ = CmpOp::GT; }
+    | LEQ { $$ = CmpOp::LEQ; }
+    | GEQ { $$ = CmpOp::GEQ; }
     ;
 
 expr:
