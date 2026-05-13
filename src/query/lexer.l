@@ -9,21 +9,24 @@
 #include <string>
 #include <unordered_map>
 
-static bool is_all_upper_or_underscore(const std::string &text) {
-    for (const unsigned char ch : text) {
-        if (std::isalpha(ch) && !std::isupper(ch)) {
-            return false;
-        }
-    }
-    return true;
-}
+static bool has_uniform_case(const std::string& text) {
+    uint8_t flags = 0;
 
-static bool is_all_lower_or_underscore(const std::string &text) {
-    for (const unsigned char ch : text) {
-        if (std::isalpha(ch) && !std::islower(ch)) {
+    constexpr uint8_t LOWER = 1 << 0;
+    constexpr uint8_t UPPER = 1 << 1;
+
+    for (unsigned char ch : text) {
+        if (std::islower(ch)) {
+            flags |= LOWER;
+        } else if (std::isupper(ch)) {
+            flags |= UPPER;
+        }
+
+        if (flags == (LOWER | UPPER)) {
             return false;
         }
     }
+
     return true;
 }
 
