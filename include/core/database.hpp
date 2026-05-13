@@ -55,5 +55,5 @@ public:
 private:
     std::string name_;
 
-    IndexTree<std::string, std::shared_ptr<Table> > tables_;
+    IndexTree<std::string, std::unique_ptr<Table> > tables_;
 };
