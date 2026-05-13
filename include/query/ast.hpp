@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
 
 //region expressions and conditions
 
