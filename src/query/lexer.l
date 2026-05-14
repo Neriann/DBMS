@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include <cerrno>
+#include <charconv>
 #include <cstdlib>
 #include <limits>
 #include <stdexcept>
@@ -72,17 +73,18 @@ static std::string unquote_string(const char *text, std::size_t len) {
     return result;
 }
 
-static int parse_int_literal(const char *text) {
-    errno = 0;
-    char *end = nullptr;
-    const long value = std::strtol(text, &end, 10);
+static int parse_int_literal(const char* text) {
+    int value = 0;
 
-    if (errno == ERANGE || *end != '\0' ||
-        value > std::numeric_limits<int>::max()) {
-        throw std::runtime_error("integer literal is out of range: " + std::string(text));
+    const auto* end = text + std::strlen(text);
+
+    const auto [ptr, ec] = std::from_chars(text, end, value);
+
+    if (ec == std::errc::result_out_of_range || ptr != end) {
+        throw std::runtime_error("invalid integer literal: " + std::string(text));
     }
 
-    return static_cast<int>(value);
+    return value;
 }
 
 #undef  YY_DECL
@@ -97,7 +99,7 @@ static int parse_int_literal(const char *text) {
 blank       [ \t\r\n]+
 comment     "--"[^\n]*
 string      \"([^\"\\]|\\[\"\\nrt])*\"
-number      [0-9]+
+number      0|[1-9][0-9]*
 identifier  [a-zA-Z_][a-zA-Z0-9_]*
 
 %%
@@ -168,3 +170,4 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 .       { throw std::runtime_error("invalid character: " + std::string(yytext, yyleng)); }
 
 %%
+
