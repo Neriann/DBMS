@@ -1,10 +1,11 @@
 #pragma once
-#include "schema.hpp"
-#include "row.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "index_tree.hpp"
+#include "row.hpp"
+#include "schema.hpp"
 
 struct Index;
 
