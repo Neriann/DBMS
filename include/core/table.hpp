@@ -18,13 +18,13 @@ public:
      *
      * @return schema of the table
      */
-    const Schema &schema() const noexcept { return schema_; }
+    [[nodiscard]] const Schema &schema() const noexcept { return schema_; }
 
     /**
      *
      * @return data of the table
      */
-    const std::vector<Row> &data() const noexcept { return data_; }
+    [[nodiscard]] const std::vector<Row> &data() const noexcept { return data_; }
 
     /**
      *

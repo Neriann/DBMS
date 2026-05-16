@@ -37,14 +37,14 @@ public:
      * @param db_name database name
      * @return returns a const reference to the named database or throws std::out_of_range.
      */
-    const Database &get_database(const std::string &db_name) const;
+    [[nodiscard]] const Database &get_database(const std::string &db_name) const;
 
     /**
      *
      * @param db_name database name
      * @return true if table with database name exists else false
      */
-    bool has_database(const std::string &db_name) const;
+    [[nodiscard]] bool has_database(const std::string &db_name) const;
 
     /**
      *
@@ -63,7 +63,7 @@ public:
      *
      * @return const pointer to current database
      */
-    const Database *current_database() const noexcept;
+    [[nodiscard]] const Database *current_database() const noexcept;
 
 private:
     DbAllocator databases_alloc_;

@@ -13,7 +13,7 @@ public:
      *
      * @return name of the database
      */
-    const std::string &name() const noexcept;
+    [[nodiscard]] const std::string &name() const noexcept;
 
     /**
      *
@@ -42,14 +42,14 @@ public:
      * @param table_name table name
      * @return const table or throws std::out_of_range.
      */
-    const Table &get_table(const std::string &table_name) const;
+    [[nodiscard]] const Table &get_table(const std::string &table_name) const;
 
     /**
      *
      * @param table_name table name
      * @return true if table with table_name exists else false
      */
-    bool has_table(const std::string &table_name) const noexcept;
+    [[nodiscard]] bool has_table(const std::string &table_name) const noexcept;
 
 private:
     std::string name_;
