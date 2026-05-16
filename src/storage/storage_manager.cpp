@@ -7,9 +7,11 @@
 using json = nlohmann::json;
 
 void to_json(json &j, const Column &c) {
-    j = json{{"name", c.name},
-             {"type", static_cast<int>(c.type)},
-             {"constraints", c.constraints}};
+    j = json{
+        {"name", c.name},
+        {"type", static_cast<int>(c.type)},
+        {"constraints", c.constraints}
+    };
 }
 
 void from_json(const json &j, Column &c) {
@@ -20,18 +22,19 @@ void from_json(const json &j, Column &c) {
     j.at("constraints").get_to(c.constraints);
 }
 
-namespace { // visible only here
+namespace {
+    // visible only here
     void write_value(std::ofstream &out, const Value &v) {
         const char type_idx = static_cast<char>(v.index());
         out.write(&type_idx, sizeof(type_idx));
 
         if (std::holds_alternative<int>(v)) {
             const auto val = std::get<int>(v);
-            out.write(reinterpret_cast<const char*>(&val), sizeof(val));
+            out.write(reinterpret_cast<const char *>(&val), sizeof(val));
         } else if (std::holds_alternative<std::string>(v)) {
             const auto &val = std::get<std::string>(v);
             const std::size_t len = val.size();
-            out.write(reinterpret_cast<const char*>(&len), sizeof(len));
+            out.write(reinterpret_cast<const char *>(&len), sizeof(len));
             out.write(val.data(), static_cast<std::streamsize>(len));
         }
     }
@@ -42,12 +45,12 @@ namespace { // visible only here
 
         if (type_idx == 0) {
             int val{};
-            in.read(reinterpret_cast<char*>(&val), sizeof(val));
+            in.read(reinterpret_cast<char *>(&val), sizeof(val));
             return val;
         }
         if (type_idx == 1) {
             std::size_t len{};
-            in.read(reinterpret_cast<char*>(&len), sizeof(len));
+            in.read(reinterpret_cast<char *>(&len), sizeof(len));
             std::string val(len, '\0');
             in.read(val.data(), static_cast<std::streamsize>(len));
             return val;
@@ -80,7 +83,7 @@ void StorageManager::load(DBMS &dbms) {
         return;
     }
 
-    for (const auto &entry : fs::directory_iterator(data_dir_)) {
+    for (const auto &entry: fs::directory_iterator(data_dir_)) {
         if (!entry.is_directory()) {
             continue;
         }
@@ -112,7 +115,7 @@ void StorageManager::load(DBMS &dbms) {
 
             std::ifstream tdf(t_path, std::ios::binary);
             bool deleted{};
-            while (tdf.read(reinterpret_cast<char*>(&deleted), sizeof(deleted))) {
+            while (tdf.read(reinterpret_cast<char *>(&deleted), sizeof(deleted))) {
                 Row row;
                 row.reserve(schema.size());
                 for (std::size_t i = 0; i < schema.size(); ++i) {
@@ -168,9 +171,9 @@ void StorageManager::save_table(const Database &db, const std::string &table_nam
     const auto &data = table.data();
     for (RowID id = 0; id < data.size(); ++id) {
         const bool deleted = table.is_deleted(id);
-        tdf.write(reinterpret_cast<const char*>(&deleted), sizeof(deleted));
+        tdf.write(reinterpret_cast<const char *>(&deleted), sizeof(deleted));
 
-        for (const auto &v : data[id]) {
+        for (const auto &v: data[id]) {
             write_value(tdf, v);
         }
     }
