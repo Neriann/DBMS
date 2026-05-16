@@ -111,10 +111,8 @@ void StorageManager::load(DBMS &dbms) {
             }
 
             std::ifstream tdf(t_path, std::ios::binary);
-            while (tdf.peek() != EOF) {
-                bool deleted{};
-                tdf.read(reinterpret_cast<char*>(&deleted), sizeof(deleted));
-
+            bool deleted{};
+            while (tdf.read(reinterpret_cast<char*>(&deleted), sizeof(deleted))) {
                 Row row;
                 row.reserve(schema.size());
                 for (std::size_t i = 0; i < schema.size(); ++i) {
