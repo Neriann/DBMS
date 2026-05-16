@@ -121,9 +121,7 @@ void StorageManager::load(DBMS &dbms) {
                     row.push_back(read_value(tdf));
                 }
 
-                if (!deleted) {
-                    table.insert(row);
-                }
+                table.restore_row(std::move(row), deleted);
             }
         }
     }

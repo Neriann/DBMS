@@ -54,6 +54,8 @@ public:
     void erase(RowID id);
 
 private:
+    friend class StorageManager;
+
     Schema schema_;
     std::vector<Row> data_;
     std::vector<bool> deleted_; // tombstone flags
@@ -66,6 +68,13 @@ private:
      * @param row row that need to be validated
      */
     void validate_row(const Row &row) const;
+
+    /**
+     *
+     * @param row row restored from persistent storage
+     * @param deleted whether the restored slot is a tombstone
+     */
+    void restore_row(Row row, bool deleted);
 
     // endregion helpers
 };

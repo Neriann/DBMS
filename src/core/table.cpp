@@ -68,6 +68,28 @@ RowID Table::insert(const Row &row) {
     return id;
 }
 
+void Table::restore_row(Row row, const bool deleted) {
+    validate_row(row);
+
+    if (!deleted) {
+        for (auto &[col_name, index]: indexes_) {
+            if (index->tree.contains(row[index->col_index])) {
+                throw std::invalid_argument("Duplicate value in INDEXED column '" + col_name + "'");
+            }
+        }
+    }
+
+    const RowID id = data_.size();
+    data_.push_back(std::move(row));
+    deleted_.push_back(deleted);
+
+    if (!deleted) {
+        for (const auto &index: indexes_ | std::views::values) {
+            index->tree.insert({data_[id][index->col_index], id});
+        }
+    }
+}
+
 void Table::update(const RowID id, Row row) {
     if (id >= data_.size() || deleted_[id]) {
         throw std::out_of_range("RowID out of range or deleted");
