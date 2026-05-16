@@ -1,5 +1,6 @@
 #include "core/table.hpp"
 #include "core/schema.hpp"
+#include "core/index_tree.hpp"
 #include <ranges>
 #include <stdexcept>
 
@@ -20,6 +21,13 @@ Table::Table(Schema schema) : schema_(std::move(schema)) {
 }
 
 Table::~Table() = default;
+
+bool Table::is_deleted(const RowID id) const {
+    if (id >= deleted_.size()) {
+        throw std::out_of_range("RowID out of range");
+    }
+    return deleted_[id];
+}
 
 void Table::validate_row(const Row &row) const {
     if (row.size() != schema_.size()) {

@@ -3,7 +3,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "index_tree.hpp"
 #include "row.hpp"
 #include "schema.hpp"
 
@@ -32,7 +31,7 @@ public:
      * @param id id of row
      * @return true for rows that have been deleted
      */
-    bool is_deleted(const RowID id) const noexcept { return deleted_[id]; }
+    [[nodiscard]] bool is_deleted(RowID id) const;
 
     /**
      *
