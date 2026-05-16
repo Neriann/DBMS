@@ -4,17 +4,17 @@
 #include <gtest/gtest.h>
 
 TEST(StorageManager, LoadSave) {
-    std::string test_dir = "test_data";
+    auto test_dir = "test_data";
     std::filesystem::remove_all(test_dir);
     {
         DBMS dbms;
         dbms.create_database("db1");
         dbms.use("db1");
-        Database *db = dbms.current_database();
+        auto *db = dbms.current_database();
         Schema s = {{"col1", ColumnType::INT, NONE}, {"col2", ColumnType::STRING, NONE}};
         db->create_table("t1", s);
 
-        Table &t1 = db->get_table("t1");
+        auto &t1 = db->get_table("t1");
         t1.insert({42, std::string("hello")});
         t1.insert({100, std::string("world")});
 
@@ -29,7 +29,7 @@ TEST(StorageManager, LoadSave) {
         sm.load(dbms2);
 
         dbms2.use("db1");
-        const Table &t1_load = dbms2.current_database()->get_table("t1");
+        const auto &t1_load = dbms2.current_database()->get_table("t1");
 
         ASSERT_EQ(t1_load.data().size(), 2);
         EXPECT_EQ(std::get<int>(t1_load.data()[0][0]), 42);
@@ -40,17 +40,17 @@ TEST(StorageManager, LoadSave) {
 }
 
 TEST(StorageManager, LoadWithDeletedRows) {
-    std::string test_dir = "test_data_deleted_rows";
+    auto test_dir = "test_data_deleted_rows";
     std::filesystem::remove_all(test_dir);
     {
         DBMS dbms;
         dbms.create_database("db1");
         dbms.use("db1");
-        Database *db = dbms.current_database();
+        auto *db = dbms.current_database();
         Schema s = {{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}};
         db->create_table("t1", s);
 
-        Table &t1 = db->get_table("t1");
+        auto &t1 = db->get_table("t1");
         t1.insert({1, std::string("deleted")});
         t1.insert({2, std::string("kept")});
         t1.erase(0);
@@ -66,7 +66,7 @@ TEST(StorageManager, LoadWithDeletedRows) {
         sm.load(dbms2);
 
         dbms2.use("db1");
-        Table &t1_load = dbms2.current_database()->get_table("t1");
+        auto &t1_load = dbms2.current_database()->get_table("t1");
 
         ASSERT_EQ(t1_load.data().size(), 2);
         EXPECT_TRUE(t1_load.is_deleted(0));
