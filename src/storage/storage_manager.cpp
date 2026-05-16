@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 
 using json = nlohmann::json;
 
@@ -22,8 +23,11 @@ void from_json(const json &j, Column &c) {
     j.at("constraints").get_to(c.constraints);
 }
 
-namespace {
-    // visible only here
+namespace { // visible only here
+    void read_safe(std::ifstream &in, char *data, const std::streamsize size) {
+        if (!in.read(data, size)) throw std::runtime_error("Corrupted table data: unexpected end of file");
+    }
+
     void write_value(std::ofstream &out, const Value &v) {
         const char type_idx = static_cast<char>(v.index());
         out.write(&type_idx, sizeof(type_idx));
@@ -41,21 +45,25 @@ namespace {
 
     Value read_value(std::ifstream &in) {
         char type_idx{};
-        in.read(&type_idx, sizeof(type_idx));
+        read_safe(in, &type_idx, sizeof(type_idx));
 
         if (type_idx == 0) {
             int val{};
-            in.read(reinterpret_cast<char *>(&val), sizeof(val));
+            read_safe(in, reinterpret_cast<char *>(&val), sizeof(val));
             return val;
         }
         if (type_idx == 1) {
             std::size_t len{};
-            in.read(reinterpret_cast<char *>(&len), sizeof(len));
+            read_safe(in, reinterpret_cast<char *>(&len), sizeof(len));
             std::string val(len, '\0');
-            in.read(val.data(), static_cast<std::streamsize>(len));
+            read_safe(in, val.data(), static_cast<std::streamsize>(len));
             return val;
         }
-        return nullptr;
+        if (type_idx == 2) {
+            return nullptr;
+        }
+
+        throw std::runtime_error("Corrupted table data: unknown value type");
     }
 }
 
@@ -133,12 +141,13 @@ void StorageManager::save(const DBMS &dbms) const {
         const auto &db = *db_it->second;
 
         save_database(db);
+        write_schema(db);
 
         for (auto table_it = db.tables_.begin(); table_it != db.tables_.end(); ++table_it) {
             const auto &table_name = table_it->first;
             const auto &table = *table_it->second;
 
-            save_table(db, table_name, table);
+            write_table_data(db.name(), table_name, table);
         }
     }
 }
@@ -165,18 +174,7 @@ void StorageManager::save_table(const Database &db, const std::string &table_nam
     std::ofstream sdf_out(s_path);
     sdf_out << j.dump(4);
 
-    const auto t_path = table_path(db_name, table_name);
-    std::ofstream tdf(t_path, std::ios::binary);
-
-    const auto &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        const bool deleted = table.is_deleted(id);
-        tdf.write(reinterpret_cast<const char *>(&deleted), sizeof(deleted));
-
-        for (const auto &v: data[id]) {
-            write_value(tdf, v);
-        }
-    }
+    write_table_data(db_name, table_name, table);
 }
 
 void StorageManager::drop_database(const std::string &db_name) const {
@@ -197,3 +195,31 @@ void StorageManager::drop_table(const std::string &db_name, const std::string &t
         out << j.dump(4);
     }
 }
+
+// region helpers implementation
+void StorageManager::write_schema(const Database &db) const {
+    json j;
+    for (auto table_it = db.tables_.begin(); table_it != db.tables_.end(); ++table_it) {
+        j[table_it->first] = table_it->second->schema();
+    }
+
+    std::ofstream out(schema_path(db.name()));
+    out << j.dump(4);
+}
+
+void StorageManager::write_table_data(const std::string &db_name, const std::string &table_name,
+                                      const Table &table) const {
+    const auto t_path = table_path(db_name, table_name);
+    std::ofstream tdf(t_path, std::ios::binary);
+
+    const auto &data = table.data();
+    for (RowID id = 0; id < data.size(); ++id) {
+        const bool deleted = table.is_deleted(id);
+        tdf.write(reinterpret_cast<const char *>(&deleted), sizeof(deleted));
+
+        for (const auto &v: data[id]) {
+            write_value(tdf, v);
+        }
+    }
+}
+// endregion helpers implementation

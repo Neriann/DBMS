@@ -77,3 +77,42 @@ TEST(StorageManager, LoadWithDeletedRows) {
         EXPECT_NO_THROW(t1_load.update(1, {3, std::string("updated")}));
     }
 }
+
+TEST(StorageManager, SaveEntireDbms) {
+    auto test_dir = "test_data_full_save";
+    std::filesystem::remove_all(test_dir);
+    {
+        DBMS dbms;
+        dbms.create_database("db1");
+        dbms.use("db1");
+
+        auto *db = dbms.current_database();
+        db->create_table("users", {{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+        db->create_table("notes", {{"body", ColumnType::STRING, NONE}, {"rank", ColumnType::INT, NONE}});
+
+        db->get_table("users").insert({1, std::string("Sebastian")});
+        db->get_table("notes").insert({std::string("hello"), 10});
+
+        StorageManager sm(test_dir);
+        sm.save(dbms);
+    }
+
+    {
+        DBMS dbms2;
+        StorageManager sm(test_dir);
+        sm.load(dbms2);
+
+        dbms2.use("db1");
+        auto *db = dbms2.current_database();
+        const auto &users = db->get_table("users");
+        const auto &notes = db->get_table("notes");
+
+        ASSERT_EQ(users.data().size(), 1);
+        EXPECT_EQ(std::get<int>(users.data()[0][0]), 1);
+        EXPECT_EQ(std::get<std::string>(users.data()[0][1]), "Sebastian");
+
+        ASSERT_EQ(notes.data().size(), 1);
+        EXPECT_EQ(std::get<std::string>(notes.data()[0][0]), "hello");
+        EXPECT_EQ(std::get<int>(notes.data()[0][1]), 10);
+    }
+}
