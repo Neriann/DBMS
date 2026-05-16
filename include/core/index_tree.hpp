@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 
 #if DBMS_INDEX_TREE == DBMS_TREE_B
 #include <b_tree.h>
