@@ -103,7 +103,7 @@ void StorageManager::load(DBMS &dbms) const {
 
         for (auto it = j.begin(); it != j.end(); ++it) {
             const auto &table_name = it.key();
-            Schema schema = it.value().get<Schema>();
+            auto schema = it.value().get<Schema>();
 
             db.create_table(table_name, schema);
             auto &table = db.get_table(table_name);
