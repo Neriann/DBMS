@@ -78,7 +78,7 @@ fs::path StorageManager::table_path(const std::string &db_name, const std::strin
     return db_path(db_name) / (table_name + ".bin");
 }
 
-void StorageManager::load(DBMS &dbms) {
+void StorageManager::load(DBMS &dbms) const {
     if (!fs::exists(data_dir_)) {
         return;
     }
@@ -128,7 +128,7 @@ void StorageManager::load(DBMS &dbms) {
     }
 }
 
-void StorageManager::save(const DBMS &dbms) {
+void StorageManager::save(const DBMS &dbms) const {
     for (auto db_it = dbms.databases_.begin(); db_it != dbms.databases_.end(); ++db_it) {
         const auto &db = *db_it->second;
 
@@ -143,14 +143,14 @@ void StorageManager::save(const DBMS &dbms) {
     }
 }
 
-void StorageManager::save_database(const Database &db) {
+void StorageManager::save_database(const Database &db) const {
     const auto d_path = db_path(db.name());
     if (!fs::exists(d_path)) {
         fs::create_directories(d_path);
     }
 }
 
-void StorageManager::save_table(const Database &db, const std::string &table_name, const Table &table) {
+void StorageManager::save_table(const Database &db, const std::string &table_name, const Table &table) const {
     const auto db_name = db.name();
 
     const auto s_path = schema_path(db_name);
@@ -179,11 +179,11 @@ void StorageManager::save_table(const Database &db, const std::string &table_nam
     }
 }
 
-void StorageManager::drop_database(const std::string &db_name) {
+void StorageManager::drop_database(const std::string &db_name) const {
     fs::remove_all(db_path(db_name));
 }
 
-void StorageManager::drop_table(const std::string &db_name, const std::string &table_name) {
+void StorageManager::drop_table(const std::string &db_name, const std::string &table_name) const {
     fs::remove(table_path(db_name, table_name));
 
     const auto s_path = schema_path(db_name);
