@@ -6,6 +6,7 @@
 #include "index_tree.hpp"
 
 class Database {
+    friend class StorageManager;
 public:
     explicit Database(std::string name);
 

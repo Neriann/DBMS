@@ -3,9 +3,11 @@
 #include <filesystem>
 #include <string>
 
+namespace fs = std::filesystem;
+
 class StorageManager {
 public:
-    explicit StorageManager(std::filesystem::path data_dir);
+    explicit StorageManager(fs::path data_dir);
 
     /**
      * @note load the entire persisted state into `dbms`
@@ -21,17 +23,18 @@ public:
 
     /**
      * @note persist a single database
-     * @param db ref to dbms
+     * @param db ref to database
      */
     void save_database(const Database &db);
 
     /**
      *
      * @param db database
+     * @param table_name table name
      * @param table table that need to be persisted
      * @note persist a single table
      */
-    void save_table(const Database &db, const Table &table);
+    void save_table(const Database &db, const std::string &table_name, const Table &table);
 
     /**
      *
@@ -49,11 +52,11 @@ public:
     void drop_table(const std::string &db_name, const std::string &table_name);
 
 private:
-    std::filesystem::path data_dir_;
+    fs::path data_dir_;
 
-    std::filesystem::path db_path(const std::string &db_name) const;
+    [[nodiscard]] fs::path db_path(const std::string &db_name) const;
 
-    std::filesystem::path table_path(const std::string &db_name, const std::string &table_name) const;
+    [[nodiscard]] fs::path table_path(const std::string &db_name, const std::string &table_name) const;
 
-    std::filesystem::path schema_path(const std::string &db_name) const;
+    [[nodiscard]] fs::path schema_path(const std::string &db_name) const;
 };

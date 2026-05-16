@@ -113,19 +113,34 @@ set(CORE_COMPILE_DEFS
         DBMS_INDEX_TREE=${INDEX_TREE_NUM}
         DBMS_ALLOCATOR=${ALLOCATOR_NUM})
 
+add_library(dbms_core ${CORE_SOURCES})
+target_include_directories(dbms_core
+        PUBLIC
+        include
+        ${CMAKE_CURRENT_BINARY_DIR}
+        ${FLEX_INCLUDE_DIRS})
+target_link_libraries(dbms_core
+        PUBLIC
+        ${INDEX_TREE_LIB}
+        ${ALLOCATOR_LIB}
+        sys_prog_cmmn
+        Boost::container
+        nlohmann_json::nlohmann_json)
+target_compile_definitions(dbms_core PUBLIC ${CORE_COMPILE_DEFS})
+
 # CLI
-add_executable(dbms src/main.cpp ${CORE_SOURCES})
-target_include_directories(dbms PRIVATE ${CORE_INCLUDE_DIRS})
-target_link_libraries(dbms PRIVATE ${CORE_LIBS})
-target_compile_definitions(dbms PRIVATE ${CORE_COMPILE_DEFS})
+add_executable(dbms src/main.cpp)
+target_link_libraries(dbms PRIVATE dbms_core)
 
 # HTTP server
-add_executable(dbms_server src/server.cpp ${CORE_SOURCES})
-target_include_directories(dbms_server PRIVATE ${CORE_INCLUDE_DIRS})
-target_link_libraries(dbms_server PRIVATE ${CORE_LIBS} Crow::Crow)
-target_compile_definitions(dbms_server PRIVATE ${CORE_COMPILE_DEFS})
+add_executable(dbms_server src/server.cpp)
+target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 # HTTP client
 add_executable(dbms_client src/client.cpp)
 target_include_directories(dbms_client PRIVATE include)
 target_link_libraries(dbms_client PRIVATE Boost::container)
+
+# Tests
+enable_testing()
+add_subdirectory(tests)
