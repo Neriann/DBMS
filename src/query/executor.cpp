@@ -273,6 +273,13 @@ std::string Executor::exec_select(const SelectStmt &s) {
         }
     }
 
+    std::set<std::string> seen_output_names;
+    for (const std::string &output_name : output_names) {
+        if (!seen_output_names.insert(output_name).second) {
+            throw std::invalid_argument("Duplicate projected output name: " + output_name);
+        }
+    }
+
     std::vector<Row> rows;
     const std::vector<Row> &data = table.data();
     for (RowID id = 0; id < data.size(); ++id) {
