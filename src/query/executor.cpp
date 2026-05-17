@@ -321,10 +321,20 @@ bool Executor::eval_condition(const Condition &cond, const Row &row, const Schem
             if (cond.predicate->op == CmpOp::NEQ) {
                 return lhs != rhs;
             }
-            return compare_values(lhs, rhs) < 0 && cond.predicate->op == CmpOp::LT
-                || compare_values(lhs, rhs) > 0 && cond.predicate->op == CmpOp::GT
-                || compare_values(lhs, rhs) <= 0 && cond.predicate->op == CmpOp::LEQ
-                || compare_values(lhs, rhs) >= 0 && cond.predicate->op == CmpOp::GEQ;
+
+            const int ordering = compare_values(lhs, rhs);
+            switch (cond.predicate->op) {
+                case CmpOp::LT:
+                    return ordering < 0;
+                case CmpOp::GT:
+                    return ordering > 0;
+                case CmpOp::LEQ:
+                    return ordering <= 0;
+                case CmpOp::GEQ:
+                    return ordering >= 0;
+                default:
+                    throw std::runtime_error("Unknown comparison operator");
+            }
         }
 
         case ConditionKind::Between: {
