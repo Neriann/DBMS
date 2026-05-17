@@ -89,6 +89,9 @@ namespace {
                 if (errno == EINTR) continue;
                 throw std::runtime_error(std::string("send failed: ") + std::strerror(errno));
             }
+            if (sent == 0) {
+                throw std::runtime_error("send failed: connection closed");
+            }
             ptr += sent;
             left -= static_cast<std::size_t>(sent);
         }
