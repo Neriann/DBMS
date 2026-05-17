@@ -43,7 +43,13 @@ int main(const int argc, char **argv) {
         [&exec, &storage, &dbms, &mtx](const crow::request &req) {
             try {
                 std::lock_guard lock(mtx);
-                const auto output = run_sql(req.body, exec);
+                std::string output;
+                try {
+                    output = run_sql(req.body, exec);
+                } catch (...) {
+                    storage.save(dbms);
+                    throw;
+                }
                 storage.save(dbms);
                 return crow::response(200, output.empty() ? "OK" : output);
             } catch (const std::exception &e) {
