@@ -4,6 +4,8 @@
 #include "parser.hpp"
 #include "query/executor.hpp"
 #include "storage/storage_manager.hpp"
+#include <cerrno>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <mutex>
@@ -25,8 +27,10 @@ int main(const int argc, char **argv) {
     std::string data_dir = "./data";
 
     if (argc > 1) {
-        const auto parsed_port = std::atoi(argv[1]);
-        if (parsed_port <= 0 || parsed_port > 65535) {
+        errno = 0;
+        char *end = nullptr;
+        const auto parsed_port = std::strtol(argv[1], &end, 10);
+        if (errno != 0 || end == argv[1] || *end != '\0' || parsed_port <= 0 || parsed_port > 65535) {
             std::cerr << "usage: " << argv[0] << " [port] [data_dir]\n";
             return 1;
         }
