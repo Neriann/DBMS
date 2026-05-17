@@ -2,10 +2,6 @@
 #include "query/scanner.hpp"
 
 #include <cctype>
-#include <cerrno>
-#include <charconv>
-#include <cstdlib>
-#include <limits>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -73,20 +69,6 @@ static std::string unquote_string(const char *text, std::size_t len) {
     return result;
 }
 
-static int parse_int_literal(const char* text) {
-    int value = 0;
-
-    const auto* end = text + std::strlen(text);
-
-    const auto [ptr, ec] = std::from_chars(text, end, value);
-
-    if (ec == std::errc::result_out_of_range || ptr != end) {
-        throw std::runtime_error("invalid integer literal: " + std::string(text));
-    }
-
-    return value;
-}
-
 #undef  YY_DECL
 #define YY_DECL yy::Parser::symbol_type Scanner::next_token()
 %}
@@ -107,7 +89,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 {blank}             { /* skip */ }
 {comment}           { /* skip */ }
 {string}            { return yy::Parser::make_STRING_LIT(unquote_string(yytext, yyleng)); }
-{number}            { return yy::Parser::make_INT_LIT(parse_int_literal(yytext)); }
+{number}            { return yy::Parser::make_INT_LIT(std::string(yytext, yyleng)); }
 {identifier}        {
                         const std::string text(yytext, yyleng);
                         const std::string lower = to_lower(text);
@@ -159,6 +141,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 "<"     { return yy::Parser::make_LT(); }
 ">"     { return yy::Parser::make_GT(); }
 "="     { return yy::Parser::make_ASSIGN(); }
+"-"     { return yy::Parser::make_NEG(); }
 "("     { return yy::Parser::make_LPAREN(); }
 ")"     { return yy::Parser::make_RPAREN(); }
 ","     { return yy::Parser::make_COMMA(); }
@@ -170,4 +153,3 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 .       { throw std::runtime_error("invalid character: " + std::string(yytext, yyleng)); }
 
 %%
-

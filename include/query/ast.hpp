@@ -12,16 +12,19 @@
 
 enum class ExprKind {
     Literal,
-    Column
+    Column,
+    UnaryMinus
 };
 
 /**
- * @note Value literal used if kind == Literal, std::string column used if kind == Column
+ * @note Value literal used if kind == Literal, std::string column used if kind == Column,
+ *       std::shared_ptr<Expr> operand used if kind == UnaryMinus
  */
 struct Expr {
     ExprKind kind;
     Value literal;
     std::string column;
+    std::shared_ptr<Expr> operand;
 };
 
 enum class CmpOp {

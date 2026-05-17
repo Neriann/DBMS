@@ -20,14 +20,36 @@
 %code {
     #include "query/scanner.hpp"
 
+    #include <charconv>
+    #include <stdexcept>
+    #include <string>
+
     static yy::Parser::symbol_type yylex(Scanner &scanner) {
         return scanner.next_token();
+    }
+
+    static Value make_int_literal(const std::string &digits, bool negative) {
+        const std::string text = negative ? "-" + digits : digits;
+
+        int value = 0;
+        const char *begin = text.data();
+        const char *end = begin + text.size();
+        const auto [ptr, ec] = std::from_chars(begin, end, value);
+
+        if (ec == std::errc::result_out_of_range) {
+            throw std::runtime_error("integer literal out of range");
+        }
+        if (ec != std::errc{} || ptr != end) {
+            throw std::runtime_error("invalid integer literal: " + text);
+        }
+
+        return Value{value};
     }
 }
 
 %token <std::string> IDENT
 %token <std::string> STRING_LIT
-%token <int> INT_LIT
+%token <std::string> INT_LIT
 %token NULL_LIT
 
 %token KW_CREATE
@@ -68,6 +90,7 @@
 %token LEQ
 %token GEQ
 %token ASSIGN
+%token NEG
 
 %left KW_OR
 %left KW_AND
@@ -76,6 +99,7 @@
 
 %type <Expr> expr
 %type <Value> literal_value
+%type <Value> int_literal_value
 
 %type <Condition> condition
 %type <Condition> or_cond
@@ -444,19 +468,25 @@ cmp_op:
 expr:
       literal_value
         {
-            $$ = Expr{ExprKind::Literal, std::move($1), ""};
+            $$ = Expr{ExprKind::Literal, std::move($1), "", nullptr};
         }
 
     | ident
         {
-            $$ = Expr{ExprKind::Column, nullptr, std::move($1)};
+            $$ = Expr{ExprKind::Column, nullptr, std::move($1), nullptr};
+        }
+
+    | NEG ident
+        {
+            Expr operand{ExprKind::Column, nullptr, std::move($2), nullptr};
+            $$ = Expr{ExprKind::UnaryMinus, nullptr, "", std::make_shared<Expr>(std::move(operand))};
         }
     ;
 
 literal_value:
-      INT_LIT
+      int_literal_value
         {
-            $$ = Value{$1};
+            $$ = std::move($1);
         }
 
     | STRING_LIT
@@ -467,6 +497,18 @@ literal_value:
     | NULL_LIT
         {
             $$ = Value{nullptr};
+        }
+    ;
+
+int_literal_value:
+      INT_LIT
+        {
+            $$ = make_int_literal($1, false);
+        }
+
+    | NEG INT_LIT
+        {
+            $$ = make_int_literal($2, true);
         }
     ;
 

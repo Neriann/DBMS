@@ -365,8 +365,23 @@ Value Executor::eval_expr(const Expr &expr, const Row &row, const Schema &schema
         return expr.literal;
     }
 
-    const int index = require_column(schema, expr.column);
-    return row[static_cast<std::size_t>(index)];
+    if (expr.kind == ExprKind::Column) {
+        const int index = require_column(schema, expr.column);
+        return row[static_cast<std::size_t>(index)];
+    }
+
+    if (expr.kind == ExprKind::UnaryMinus) {
+        if (!expr.operand) {
+            throw std::runtime_error("Malformed unary minus expression");
+        }
+        const Value operand_value = eval_expr(*expr.operand, row, schema);
+        if (!std::holds_alternative<int>(operand_value)) {
+            throw std::runtime_error("Unary minus expects an integer operand");
+        }
+        return -std::get<int>(operand_value);
+    }
+
+    throw std::runtime_error("Unknown expression kind");
 }
 
 // endregion
