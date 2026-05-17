@@ -92,9 +92,6 @@
 %token ASSIGN
 %token NEG
 
-%left KW_OR
-%left KW_AND
-
 %type <Statement> statement
 
 %type <Expr> expr
@@ -102,7 +99,6 @@
 %type <Value> int_literal_value
 
 %type <Condition> condition
-%type <Condition> or_cond
 %type <Condition> and_cond
 %type <Condition> primary_cond
 
@@ -387,19 +383,12 @@ opt_where:
     ;
 
 condition:
-      or_cond
-        {
-            $$ = std::move($1);
-        }
-    ;
-
-or_cond:
       and_cond
         {
             $$ = std::move($1);
         }
 
-    | or_cond KW_OR and_cond
+    | condition KW_OR and_cond
         {
             Condition cond;
             cond.kind = ConditionKind::Or;
