@@ -21,8 +21,7 @@ static std::vector<Statement> parse_sql(const std::string &sql) {
 static void run(const std::string &source, Executor &exec) {
     for (const Statement &stmt: parse_sql(source)) {
         try {
-            std::string result = exec.execute(stmt);
-            if (!result.empty()) std::cout << result << "\n";
+            if (std::string result = exec.execute(stmt); !result.empty()) std::cout << result << "\n";
         } catch (const std::exception &e) {
             std::cerr << "error: " << e.what() << "\n";
         }

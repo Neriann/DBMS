@@ -139,8 +139,6 @@ target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 # HTTP client
 add_executable(dbms_client src/client.cpp)
-target_include_directories(dbms_client PRIVATE include)
-target_link_libraries(dbms_client PRIVATE Boost::container)
 
 # Tests
 enable_testing()
