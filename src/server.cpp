@@ -2,11 +2,14 @@
 #include "core/dbms.hpp"
 #include "query/executor.hpp"
 #include "query/query_runner.hpp"
+#include "server/access_logger.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
 #include <cstdlib>
 #include <exception>
+#include <filesystem>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <string>
 
@@ -37,7 +40,9 @@ int main(const int argc, char **argv) {
     storage.load(dbms);
     Executor exec(dbms);
     std::mutex mtx;
-    crow::SimpleApp app;
+    const auto access_log_path = std::filesystem::path(data_dir) / "access.log";
+    const auto access_logger = std::make_shared<AccessLogger>(access_log_path);
+    crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger});
 
     CROW_ROUTE(app, "/query").methods(crow::HTTPMethod::Post)(
         [&exec, &storage, &dbms, &mtx](const crow::request &req) {
@@ -58,6 +63,7 @@ int main(const int argc, char **argv) {
         });
 
     std::cout << "dbms_server listening on port " << port
-            << ", data dir: " << data_dir << "\n";
+            << ", data dir: " << data_dir
+            << ", access log: " << access_log_path << "\n";
     app.port(port).multithreaded().run();
 }
