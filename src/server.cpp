@@ -41,7 +41,13 @@ int main(const int argc, char **argv) {
     Executor exec(dbms);
     std::mutex mtx;
     const auto access_log_path = std::filesystem::path(data_dir) / "access.log";
-    const auto access_logger = std::make_shared<AccessLogger>(access_log_path);
+    std::shared_ptr<AccessLogger> access_logger;
+    try {
+        access_logger = std::make_shared<AccessLogger>(access_log_path);
+    } catch (const std::exception &e) {
+        std::cerr << "failed to initialize access logging: " << e.what() << "\n";
+        return 1;
+    }
     crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger});
 
     CROW_ROUTE(app, "/query").methods(crow::HTTPMethod::Post)(
