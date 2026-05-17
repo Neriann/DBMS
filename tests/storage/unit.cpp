@@ -116,3 +116,30 @@ TEST(StorageManager, SaveEntireDbms) {
         EXPECT_EQ(std::get<int>(notes.data()[0][1]), 10);
     }
 }
+
+TEST(StorageManager, SavePrunesDroppedDatabases) {
+    const auto test_dir = "test_data_prune_dropped_databases";
+    std::filesystem::remove_all(test_dir);
+
+    {
+        DBMS dbms;
+        dbms.create_database("kept");
+        dbms.create_database("dropped");
+
+        const StorageManager sm(test_dir);
+        sm.save(dbms);
+
+        dbms.drop_database("dropped");
+        sm.save(dbms);
+    }
+
+    {
+        DBMS dbms2;
+        const StorageManager sm(test_dir);
+        sm.load(dbms2);
+
+        EXPECT_TRUE(dbms2.has_database("kept"));
+        EXPECT_FALSE(dbms2.has_database("dropped"));
+        EXPECT_FALSE(std::filesystem::exists(std::filesystem::path(test_dir) / "dropped"));
+    }
+}

@@ -137,6 +137,17 @@ void StorageManager::load(DBMS &dbms) const {
 }
 
 void StorageManager::save(const DBMS &dbms) const {
+    for (const auto &entry: fs::directory_iterator(data_dir_)) {
+        if (!entry.is_directory()) {
+            continue;
+        }
+
+        const auto db_name = entry.path().filename().string();
+        if (!dbms.has_database(db_name)) {
+            fs::remove_all(entry.path());
+        }
+    }
+
     for (auto db_it = dbms.databases_.begin(); db_it != dbms.databases_.end(); ++db_it) {
         const auto &db = *db_it->second;
 
