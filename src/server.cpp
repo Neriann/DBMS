@@ -5,7 +5,6 @@
 #include "query/executor.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
-#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <mutex>
