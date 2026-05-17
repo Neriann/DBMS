@@ -48,7 +48,8 @@ int main(const int argc, char **argv) {
         std::cerr << "failed to initialize access logging: " << e.what() << "\n";
         return 1;
     }
-    crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger});
+    auto telemetry = std::make_shared<TelemetryCollector>();
+    crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger, telemetry});
 
     CROW_ROUTE(app, "/query").methods(crow::HTTPMethod::Post)(
         [&exec, &storage, &dbms, &mtx](const crow::request &req) {
@@ -66,6 +67,14 @@ int main(const int argc, char **argv) {
             } catch (const std::exception &e) {
                 return crow::response(400, e.what());
             }
+        });
+
+    CROW_ROUTE(app, "/metrics").methods(crow::HTTPMethod::Get)(
+        [telemetry]() {
+            crow::response response(telemetry->snapshot_json());
+            response.code = 200;
+            response.set_header("Content-Type", "application/json");
+            return response;
         });
 
     std::cout << "dbms_server listening on port " << port
