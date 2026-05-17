@@ -337,11 +337,15 @@ bool Executor::eval_condition(const Condition &cond, const Row &row, const Schem
             }
 
             const Value lhs = eval_expr(cond.like->lhs, row, schema);
+            const Value rhs = eval_expr(cond.like->rhs, row, schema);
             if (!std::holds_alternative<std::string>(lhs)) {
                 throw std::runtime_error("LIKE expects a string left operand");
             }
+            if (!std::holds_alternative<std::string>(rhs)) {
+                throw std::runtime_error("LIKE expects a string right operand");
+            }
 
-            return std::regex_match(std::get<std::string>(lhs), std::regex(cond.like->pattern));
+            return std::regex_match(std::get<std::string>(lhs), std::regex(std::get<std::string>(rhs)));
         }
 
         case ConditionKind::And:

@@ -50,11 +50,11 @@ struct BetweenPredicate {
 };
 
 /**
- * @note lhs LIKE regex_pattern
+ * @note lhs LIKE rhs, where rhs evaluates to a regex string
  */
 struct LikePredicate {
     Expr lhs;
-    std::string pattern;
+    Expr rhs;
 };
 
 enum class ConditionKind {

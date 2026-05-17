@@ -428,7 +428,7 @@ primary_cond:
             $$ = std::move(cond);
         }
 
-    | expr KW_LIKE STRING_LIT
+    | expr KW_LIKE expr
         {
             Condition cond;
             cond.kind = ConditionKind::Like;
