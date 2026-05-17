@@ -59,21 +59,20 @@ namespace {
         hints.ai_family = AF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
 
-        addrinfo *result = nullptr;
-        if (const auto rc = getaddrinfo(host.c_str(), port.c_str(), &hints, &result); rc != 0) {
+        addrinfo *raw = nullptr;
+        if (const auto rc = getaddrinfo(host.c_str(), port.c_str(), &hints, &raw); rc != 0) {
             throw std::runtime_error(std::string("getaddrinfo failed: ") + gai_strerror(rc));
         }
+        const std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> result(raw, freeaddrinfo);
 
         int fd = -1;
-        for (const auto *rp = result; rp != nullptr; rp = rp->ai_next) {
+        for (auto rp = result.get(); rp != nullptr; rp = rp->ai_next) {
             fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
             if (fd == -1) continue;
             if (connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) break;
             close(fd);
             fd = -1;
         }
-
-        freeaddrinfo(result);
 
         if (fd == -1) throw std::runtime_error("cannot connect to " + host + ":" + port);
 
