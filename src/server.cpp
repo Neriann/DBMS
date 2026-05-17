@@ -1,25 +1,14 @@
 #include "crow.h"
 #include "core/dbms.hpp"
-#include "query/scanner.hpp"
-#include "parser.hpp"
 #include "query/executor.hpp"
+#include "query/query_runner.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
+#include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <mutex>
-#include <sstream>
 #include <string>
-#include <vector>
-
-static std::vector<Statement> parse_sql(const std::string &sql) {
-    std::istringstream in(sql);
-    Scanner scanner(in);
-    std::vector<Statement> stmts;
-    yy::Parser parser(scanner, stmts);
-    parser.parse();
-    return stmts;
-}
 
 int main(const int argc, char **argv) {
     std::uint16_t port = 8080;
@@ -54,13 +43,7 @@ int main(const int argc, char **argv) {
         [&exec, &storage, &dbms, &mtx](const crow::request &req) {
             try {
                 std::lock_guard lock(mtx);
-                std::string output;
-                for (const Statement &stmt: parse_sql(req.body)) {
-                    if (auto r = exec.execute(stmt); !r.empty()) {
-                        if (!output.empty()) output += '\n';
-                        output += r;
-                    }
-                }
+                const auto output = run_sql(req.body, exec);
                 storage.save(dbms);
                 return crow::response(200, output.empty() ? "OK" : output);
             } catch (const std::exception &e) {

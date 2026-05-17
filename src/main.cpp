@@ -1,7 +1,6 @@
 #include "core/dbms.hpp"
-#include "query/scanner.hpp"
-#include "parser.hpp"
 #include "query/executor.hpp"
+#include "query/query_runner.hpp"
 #include "storage/storage_manager.hpp"
 
 #include <fstream>
@@ -9,22 +8,13 @@
 #include <sstream>
 #include <string>
 
-static std::vector<Statement> parse_sql(const std::string &sql) {
-    std::istringstream in(sql);
-    Scanner scanner(in);
-    std::vector<Statement> stmts;
-    yy::Parser parser(scanner, stmts);
-    parser.parse();
-    return stmts;
-}
-
 static void run(const std::string &source, Executor &exec) {
-    for (const Statement &stmt: parse_sql(source)) {
-        try {
-            if (std::string result = exec.execute(stmt); !result.empty()) std::cout << result << "\n";
-        } catch (const std::exception &e) {
-            std::cerr << "error: " << e.what() << "\n";
+    try {
+        if (const auto result = run_sql(source, exec); !result.empty()) {
+            std::cout << result << "\n";
         }
+    } catch (const std::exception &e) {
+        std::cerr << "error: " << e.what() << "\n";
     }
 }
 
