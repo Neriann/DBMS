@@ -90,8 +90,11 @@ set(CORE_SOURCES
 
 set(CORE_INCLUDE_DIRS
         include
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${FLEX_INCLUDE_DIRS})
+        ${CMAKE_CURRENT_BINARY_DIR})
+
+if (FLEX_INCLUDE_DIRS)
+    list(APPEND CORE_INCLUDE_DIRS ${FLEX_INCLUDE_DIRS})
+endif ()
 
 set(CORE_LIBS
         ${INDEX_TREE_LIB}
@@ -116,9 +119,7 @@ set(CORE_COMPILE_DEFS
 add_library(dbms_core ${CORE_SOURCES})
 target_include_directories(dbms_core
         PUBLIC
-        include
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${FLEX_INCLUDE_DIRS})
+        ${CORE_INCLUDE_DIRS})
 target_link_libraries(dbms_core
         PUBLIC
         ${INDEX_TREE_LIB}
