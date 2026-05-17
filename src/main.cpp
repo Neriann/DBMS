@@ -1,7 +1,6 @@
 #include "core/dbms.hpp"
-#include "query/scanner.hpp"
-#include "parser.hpp"
 #include "query/executor.hpp"
+#include "query/query_runner.hpp"
 #include "storage/storage_manager.hpp"
 
 #include <fstream>
@@ -9,27 +8,22 @@
 #include <sstream>
 #include <string>
 
-static std::vector<Statement> parse_sql(const std::string &sql) {
-    std::istringstream in(sql);
-    Scanner scanner(in);
-    std::vector<Statement> stmts;
-    yy::Parser parser(scanner, stmts);
-    parser.parse();
-    return stmts;
-}
-
 static void run(const std::string &source, Executor &exec) {
-    for (const Statement &stmt: parse_sql(source)) {
-        try {
-            std::string result = exec.execute(stmt);
-            if (!result.empty()) std::cout << result << "\n";
-        } catch (const std::exception &e) {
-            std::cerr << "error: " << e.what() << "\n";
+    try {
+        if (const auto result = run_sql(source, exec); !result.empty()) {
+            std::cout << result << "\n";
         }
+    } catch (const std::exception &e) {
+        std::cerr << "error: " << e.what() << "\n";
     }
 }
 
 int main(int argc, char **argv) {
+    if (argc > 2) {
+        std::cerr << "usage: " << argv[0] << " [file.sql]\n";
+        return 1;
+    }
+
     DBMS dbms;
     StorageManager storage("./data");
     storage.load(dbms);
@@ -41,11 +35,7 @@ int main(int argc, char **argv) {
         while (std::getline(std::cin, line)) {
             buf += line + '\n';
             if (buf.find(';') != std::string::npos) {
-                try {
-                    run(buf, exec);
-                } catch (const std::exception &e) {
-                    std::cerr << "error: " << e.what() << "\n";
-                }
+                run(buf, exec);
                 buf.clear();
             }
         }
@@ -57,11 +47,7 @@ int main(int argc, char **argv) {
         }
         std::ostringstream ss;
         ss << file.rdbuf();
-        try {
-            run(ss.str(), exec);
-        } catch (const std::exception &e) {
-            std::cerr << "error: " << e.what() << "\n";
-        }
+        run(ss.str(), exec);
     }
 
     storage.save(dbms);
