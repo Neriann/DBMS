@@ -48,6 +48,8 @@ std::string AccessLogger::format_time(const std::chrono::system_clock::time_poin
     return out.str();
 }
 
+// Crow middleware detection requires this exact non-static signature
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void AccessLogMiddleware::before_handle(crow::request &, crow::response &, context &ctx) const {
     ctx.started_at = std::chrono::system_clock::now();
 
@@ -56,6 +58,8 @@ void AccessLogMiddleware::before_handle(crow::request &, crow::response &, conte
     ctx.handler_id = id.str();
 }
 
+// Crow middleware detection requires this exact non-static signature
+// NOLINTNEXTLINE(readability-non-const-parameter)
 void AccessLogMiddleware::after_handle(crow::request &req, crow::response &res, context &ctx) const {
     if (!logger) return;
 
