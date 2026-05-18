@@ -27,10 +27,6 @@ nlohmann::json count_json(const std::string &operation, const std::size_t count)
     return nlohmann::json{{"status", "ok"}, {"operation", operation}, {"count", count}};
 }
 
-bool is_null(const Value &value) {
-    return std::holds_alternative<std::nullptr_t>(value);
-}
-
 std::unordered_map<std::string, int> build_column_index_map(const Schema &schema) {
     std::unordered_map<std::string, int> indexes;
     indexes.reserve(schema.size());
