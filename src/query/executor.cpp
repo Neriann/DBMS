@@ -249,7 +249,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
 
-    std::size_t deleted = 0;
+    std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
     for (RowID id = 0; id < data.size(); ++id) {
         if (table.is_deleted(id)) {
@@ -259,11 +259,14 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
             continue;
         }
 
-        table.erase(id);
-        ++deleted;
+        matching_ids.push_back(id);
     }
 
-    return count_json("delete", deleted).dump();
+    for (const RowID id : matching_ids) {
+        table.erase(id);
+    }
+
+    return count_json("delete", matching_ids.size()).dump();
 }
 
 std::string Executor::exec_select(const SelectStmt &s) {
