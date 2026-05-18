@@ -1,6 +1,7 @@
 #pragma once
 
 #include "crow.h"
+#include "server/telemetry.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -29,10 +30,12 @@ private:
 struct AccessLogMiddleware {
     struct context {
         std::chrono::system_clock::time_point started_at;
+        TelemetryCollector::clock::time_point telemetry_started_at;
         std::string handler_id;
     };
 
     std::shared_ptr<AccessLogger> logger;
+    std::shared_ptr<TelemetryCollector> telemetry;
 
     void before_handle(crow::request &req, crow::response &res, context &ctx) const;
 

@@ -52,6 +52,7 @@ std::string AccessLogger::format_time(const std::chrono::system_clock::time_poin
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 void AccessLogMiddleware::before_handle(crow::request &, crow::response &, context &ctx) const {
     ctx.started_at = std::chrono::system_clock::now();
+    ctx.telemetry_started_at = TelemetryCollector::clock::now();
 
     std::ostringstream id;
     id << std::this_thread::get_id();
@@ -61,6 +62,10 @@ void AccessLogMiddleware::before_handle(crow::request &, crow::response &, conte
 // Crow middleware detection requires this exact non-static signature
 // NOLINTNEXTLINE(readability-non-const-parameter)
 void AccessLogMiddleware::after_handle(crow::request &req, crow::response &res, context &ctx) const {
+    if (telemetry) {
+        telemetry->record_request(ctx.telemetry_started_at, TelemetryCollector::clock::now(), res.code);
+    }
+
     if (!logger) return;
 
     logger->log(req, res, ctx.started_at, std::chrono::system_clock::now(), ctx.handler_id);

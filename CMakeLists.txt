@@ -137,7 +137,8 @@ target_link_libraries(dbms PRIVATE dbms_core)
 # HTTP server
 add_executable(dbms_server
         src/server.cpp
-        src/server/access_logger.cpp)
+        src/server/access_logger.cpp
+        src/server/telemetry.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 # HTTP client
