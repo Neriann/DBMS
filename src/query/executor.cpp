@@ -186,7 +186,8 @@ std::string Executor::exec_insert(const InsertStmt &s) {
         column_indexes.push_back(require_column(schema_indexes, column));
     }
 
-    std::size_t inserted = 0;
+    std::vector<Row> rows;
+    rows.reserve(s.rows.size());
     for (const Row &input_row : s.rows) {
         if (input_row.size() != column_indexes.size()) {
             throw std::runtime_error("INSERT row value count does not match column count");
@@ -197,9 +198,11 @@ std::string Executor::exec_insert(const InsertStmt &s) {
             row[static_cast<std::size_t>(column_indexes[i])] = input_row[i];
         }
 
-        table.insert(row);
-        ++inserted;
+        rows.push_back(std::move(row));
     }
+
+    const std::size_t inserted = rows.size();
+    table.insert_many(rows);
 
     return count_json("insert", inserted).dump();
 }
@@ -219,7 +222,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
         assignments.push_back({require_column(column_indexes, column), expr});
     }
 
-    std::size_t updated = 0;
+    std::vector<std::pair<RowID, Row>> updates;
     const std::vector<Row> &data = table.data();
     for (RowID id = 0; id < data.size(); ++id) {
         if (table.is_deleted(id)) {
@@ -233,9 +236,11 @@ std::string Executor::exec_update(const UpdateStmt &s) {
         for (const auto &[index, expr] : assignments) {
             new_row[static_cast<std::size_t>(index)] = eval_expr(expr, data[id], column_indexes);
         }
-        table.update(id, std::move(new_row));
-        ++updated;
+        updates.emplace_back(id, std::move(new_row));
     }
+
+    const std::size_t updated = updates.size();
+    table.update_many(std::move(updates));
 
     return count_json("update", updated).dump();
 }
