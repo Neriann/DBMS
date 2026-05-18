@@ -1,6 +1,7 @@
 #include "query/executor.hpp"
 
 #include <nlohmann/json.hpp>
+#include <limits>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -399,7 +400,11 @@ Value Executor::eval_expr(const Expr &expr, const Row &row, const Schema &schema
         if (!std::holds_alternative<int>(operand_value)) {
             throw std::runtime_error("Unary minus expects an integer operand");
         }
-        return -std::get<int>(operand_value);
+        const int value = std::get<int>(operand_value);
+        if (value == std::numeric_limits<int>::min()) {
+            throw std::runtime_error("Unary minus result is out of range");
+        }
+        return -value;
     }
 
     throw std::runtime_error("Unknown expression kind");
