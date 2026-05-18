@@ -124,7 +124,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 
                         const auto it = keywords.find(lower);
                         if (it == keywords.end()) {
-                            return yy::Parser::make_IDENT(text);;
+                            return yy::Parser::make_IDENT(text);
                         }
 
                         if (!has_uniform_case(text)) {
