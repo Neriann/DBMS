@@ -80,7 +80,7 @@ static std::string unquote_string(const char *text, std::size_t len) {
 
 blank       [ \t\r\n]+
 comment     "--"[^\n]*
-string      \"([^\"\\]|\\[\"\\nrt])*\"
+string      \"([^\"\\]|\\.)*\"
 number      0|[1-9][0-9]*
 identifier  [a-zA-Z_][a-zA-Z0-9_]*
 
