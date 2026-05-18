@@ -23,13 +23,13 @@ struct Column {
      *
      * @return true if column is not null else false
      */
-    bool is_not_null() const noexcept;
+    [[nodiscard]] bool is_not_null() const noexcept;
 
     /**
      *
      * @return true if column is indexed else false
      */
-    bool is_indexed() const noexcept;
+    [[nodiscard]] bool is_indexed() const noexcept;
 };
 
 using Schema = std::vector<Column>;

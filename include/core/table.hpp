@@ -3,7 +3,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "index_tree.hpp"
 #include "row.hpp"
 #include "schema.hpp"
 
@@ -19,20 +18,20 @@ public:
      *
      * @return schema of the table
      */
-    const Schema &schema() const noexcept { return schema_; }
+    [[nodiscard]] const Schema &schema() const noexcept { return schema_; }
 
     /**
      *
      * @return data of the table
      */
-    const std::vector<Row> &data() const noexcept { return data_; }
+    [[nodiscard]] const std::vector<Row> &data() const noexcept { return data_; }
 
     /**
      *
      * @param id id of row
      * @return true for rows that have been deleted
      */
-    bool is_deleted(const RowID id) const noexcept { return deleted_[id]; }
+    [[nodiscard]] bool is_deleted(RowID id) const;
 
     /**
      *
@@ -55,6 +54,8 @@ public:
     void erase(RowID id);
 
 private:
+    friend class StorageManager;
+
     Schema schema_;
     std::vector<Row> data_;
     std::vector<bool> deleted_; // tombstone flags
@@ -67,6 +68,13 @@ private:
      * @param row row that need to be validated
      */
     void validate_row(const Row &row) const;
+
+    /**
+     *
+     * @param row row restored from persistent storage
+     * @param deleted whether the restored slot is a tombstone
+     */
+    void restore_row(Row row, bool deleted);
 
     // endregion helpers
 };

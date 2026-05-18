@@ -1,5 +1,6 @@
 #include "core/table.hpp"
 #include "core/schema.hpp"
+#include "core/index_tree.hpp"
 #include <ranges>
 #include <stdexcept>
 
@@ -20,6 +21,13 @@ Table::Table(Schema schema) : schema_(std::move(schema)) {
 }
 
 Table::~Table() = default;
+
+bool Table::is_deleted(const RowID id) const {
+    if (id >= deleted_.size()) {
+        throw std::out_of_range("RowID out of range");
+    }
+    return deleted_[id];
+}
 
 void Table::validate_row(const Row &row) const {
     if (row.size() != schema_.size()) {
@@ -58,6 +66,28 @@ RowID Table::insert(const Row &row) {
     }
 
     return id;
+}
+
+void Table::restore_row(Row row, const bool deleted) {
+    validate_row(row);
+
+    if (!deleted) {
+        for (auto &[col_name, index]: indexes_) {
+            if (index->tree.contains(row[index->col_index])) {
+                throw std::invalid_argument("Duplicate value in INDEXED column '" + col_name + "'");
+            }
+        }
+    }
+
+    const RowID id = data_.size();
+    data_.push_back(std::move(row));
+    deleted_.push_back(deleted);
+
+    if (!deleted) {
+        for (const auto &index: indexes_ | std::views::values) {
+            index->tree.insert({data_[id][index->col_index], id});
+        }
+    }
 }
 
 void Table::update(const RowID id, Row row) {

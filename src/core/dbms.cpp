@@ -3,7 +3,7 @@
 
 DBMS::DBMS()
 #if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
-    : databases_alloc_(),
+    :
 #else
     : databases_alloc_(1u << 20), // 1 MiB for now
 #endif
