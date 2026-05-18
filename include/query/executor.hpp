@@ -2,6 +2,7 @@
 #include "ast.hpp"
 #include "../core/dbms.hpp"
 #include <string>
+#include <unordered_map>
 
 
 class Executor {
@@ -95,7 +96,10 @@ private:
      * @param schema schema of the table
      * @return true if the row satisfies the condition
      */
-    static bool eval_condition(const Condition &cond, const Row &row, const Schema &schema);
+    static bool eval_condition(
+        const Condition &cond,
+        const Row &row,
+        const std::unordered_map<std::string, int> &column_indexes);
 
     /**
      * @param expr expression to evaluate
@@ -103,7 +107,10 @@ private:
      * @param schema schema of the table
      * @return resulting Value
      */
-    static Value eval_expr(const Expr &expr, const Row &row, const Schema &schema);
+    static Value eval_expr(
+        const Expr &expr,
+        const Row &row,
+        const std::unordered_map<std::string, int> &column_indexes);
 
     /**
      * @param rows result set to serialise

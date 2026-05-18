@@ -6,6 +6,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <variant>
 
 namespace {
@@ -30,12 +31,23 @@ bool is_null(const Value &value) {
     return std::holds_alternative<std::nullptr_t>(value);
 }
 
-int require_column(const Schema &schema, const std::string &name) {
-    const int index = find(schema, name);
-    if (index < 0) {
+std::unordered_map<std::string, int> build_column_index_map(const Schema &schema) {
+    std::unordered_map<std::string, int> indexes;
+    indexes.reserve(schema.size());
+    for (std::size_t i = 0; i < schema.size(); ++i) {
+        indexes.emplace(schema[i].name, static_cast<int>(i));
+    }
+    return indexes;
+}
+
+int require_column(
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::string &name) {
+    const auto it = column_indexes.find(name);
+    if (it == column_indexes.end()) {
         throw std::runtime_error("Unknown column '" + name + "'");
     }
-    return index;
+    return it->second;
 }
 
 void ensure_no_duplicate(const std::set<std::string> &names, const std::string &name) {
@@ -166,6 +178,7 @@ std::string Executor::exec_drop_table(const DropTableStmt &s) {
 std::string Executor::exec_insert(const InsertStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
+    const std::unordered_map<std::string, int> schema_indexes = build_column_index_map(schema);
 
     std::vector<int> column_indexes;
     column_indexes.reserve(s.columns.size());
@@ -174,7 +187,7 @@ std::string Executor::exec_insert(const InsertStmt &s) {
     for (const std::string &column : s.columns) {
         ensure_no_duplicate(seen, column);
         seen.insert(column);
-        column_indexes.push_back(require_column(schema, column));
+        column_indexes.push_back(require_column(schema_indexes, column));
     }
 
     std::size_t inserted = 0;
@@ -198,6 +211,7 @@ std::string Executor::exec_insert(const InsertStmt &s) {
 std::string Executor::exec_update(const UpdateStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
+    const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
 
     std::vector<std::pair<int, Expr>> assignments;
     assignments.reserve(s.assignments.size());
@@ -206,7 +220,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
     for (const auto &[column, expr] : s.assignments) {
         ensure_no_duplicate(seen, column);
         seen.insert(column);
-        assignments.push_back({require_column(schema, column), expr});
+        assignments.push_back({require_column(column_indexes, column), expr});
     }
 
     std::size_t updated = 0;
@@ -215,13 +229,13 @@ std::string Executor::exec_update(const UpdateStmt &s) {
         if (table.is_deleted(id)) {
             continue;
         }
-        if (s.where && !eval_condition(*s.where, data[id], schema)) {
+        if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
 
         Row new_row = data[id];
         for (const auto &[index, expr] : assignments) {
-            new_row[static_cast<std::size_t>(index)] = eval_expr(expr, data[id], schema);
+            new_row[static_cast<std::size_t>(index)] = eval_expr(expr, data[id], column_indexes);
         }
         table.update(id, std::move(new_row));
         ++updated;
@@ -233,6 +247,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
 std::string Executor::exec_delete(const DeleteStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
+    const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
 
     std::size_t deleted = 0;
     const std::vector<Row> &data = table.data();
@@ -240,7 +255,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
         if (table.is_deleted(id)) {
             continue;
         }
-        if (s.where && !eval_condition(*s.where, data[id], schema)) {
+        if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
 
@@ -254,6 +269,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
 std::string Executor::exec_select(const SelectStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
+    const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
 
     std::vector<int> selected_indexes;
     std::vector<std::string> output_names;
@@ -269,7 +285,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
         selected_indexes.reserve(s.columns.size());
         output_names.reserve(s.columns.size());
         for (const SelectColumn &column : s.columns) {
-            selected_indexes.push_back(require_column(schema, column.name));
+            selected_indexes.push_back(require_column(column_indexes, column.name));
             output_names.push_back(column.alias.empty() ? column.name : column.alias);
         }
     }
@@ -287,7 +303,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
         if (table.is_deleted(id)) {
             continue;
         }
-        if (s.where && !eval_condition(*s.where, data[id], schema)) {
+        if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
 
@@ -306,15 +322,18 @@ std::string Executor::exec_select(const SelectStmt &s) {
 
 // region Evaluation
 
-bool Executor::eval_condition(const Condition &cond, const Row &row, const Schema &schema) {
+bool Executor::eval_condition(
+    const Condition &cond,
+    const Row &row,
+    const std::unordered_map<std::string, int> &column_indexes) {
     switch (cond.kind) {
         case ConditionKind::Simple: {
             if (!cond.predicate) {
                 throw std::runtime_error("Malformed simple condition");
             }
 
-            const Value lhs = eval_expr(cond.predicate->lhs, row, schema);
-            const Value rhs = eval_expr(cond.predicate->rhs, row, schema);
+            const Value lhs = eval_expr(cond.predicate->lhs, row, column_indexes);
+            const Value rhs = eval_expr(cond.predicate->rhs, row, column_indexes);
 
             if (cond.predicate->op == CmpOp::EQ) {
                 return lhs == rhs;
@@ -343,9 +362,9 @@ bool Executor::eval_condition(const Condition &cond, const Row &row, const Schem
                 throw std::runtime_error("Malformed BETWEEN condition");
             }
 
-            const Value lhs = eval_expr(cond.between->lhs, row, schema);
-            const Value lo = eval_expr(cond.between->lo, row, schema);
-            const Value hi = eval_expr(cond.between->hi, row, schema);
+            const Value lhs = eval_expr(cond.between->lhs, row, column_indexes);
+            const Value lo = eval_expr(cond.between->lo, row, column_indexes);
+            const Value hi = eval_expr(cond.between->hi, row, column_indexes);
             return compare_values(lhs, lo) >= 0 && compare_values(lhs, hi) < 0;
         }
 
@@ -354,8 +373,8 @@ bool Executor::eval_condition(const Condition &cond, const Row &row, const Schem
                 throw std::runtime_error("Malformed LIKE condition");
             }
 
-            const Value lhs = eval_expr(cond.like->lhs, row, schema);
-            const Value rhs = eval_expr(cond.like->rhs, row, schema);
+            const Value lhs = eval_expr(cond.like->lhs, row, column_indexes);
+            const Value rhs = eval_expr(cond.like->rhs, row, column_indexes);
             if (!std::holds_alternative<std::string>(lhs)) {
                 throw std::runtime_error("LIKE expects a string left operand");
             }
@@ -370,25 +389,30 @@ bool Executor::eval_condition(const Condition &cond, const Row &row, const Schem
             if (!cond.left || !cond.right) {
                 throw std::runtime_error("Malformed AND condition");
             }
-            return eval_condition(*cond.left, row, schema) && eval_condition(*cond.right, row, schema);
+            return eval_condition(*cond.left, row, column_indexes)
+                && eval_condition(*cond.right, row, column_indexes);
 
         case ConditionKind::Or:
             if (!cond.left || !cond.right) {
                 throw std::runtime_error("Malformed OR condition");
             }
-            return eval_condition(*cond.left, row, schema) || eval_condition(*cond.right, row, schema);
+            return eval_condition(*cond.left, row, column_indexes)
+                || eval_condition(*cond.right, row, column_indexes);
     }
 
     throw std::runtime_error("Unknown condition kind");
 }
 
-Value Executor::eval_expr(const Expr &expr, const Row &row, const Schema &schema) {
+Value Executor::eval_expr(
+    const Expr &expr,
+    const Row &row,
+    const std::unordered_map<std::string, int> &column_indexes) {
     if (expr.kind == ExprKind::Literal) {
         return expr.literal;
     }
 
     if (expr.kind == ExprKind::Column) {
-        const int index = require_column(schema, expr.column);
+        const int index = require_column(column_indexes, expr.column);
         return row[static_cast<std::size_t>(index)];
     }
 
@@ -396,7 +420,7 @@ Value Executor::eval_expr(const Expr &expr, const Row &row, const Schema &schema
         if (!expr.operand) {
             throw std::runtime_error("Malformed unary minus expression");
         }
-        const Value operand_value = eval_expr(*expr.operand, row, schema);
+        const Value operand_value = eval_expr(*expr.operand, row, column_indexes);
         if (!std::holds_alternative<int>(operand_value)) {
             throw std::runtime_error("Unary minus expects an integer operand");
         }
