@@ -113,6 +113,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
                             {"not", yy::Parser::token::KW_NOT},
                             {"not_null", yy::Parser::token::KW_NOT_NULL},
                             {"indexed", yy::Parser::token::KW_INDEXED},
+                            {"default", yy::Parser::token::KW_DEFAULT},
                             {"and", yy::Parser::token::KW_AND},
                             {"or", yy::Parser::token::KW_OR},
                             {"between", yy::Parser::token::KW_BETWEEN},

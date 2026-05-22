@@ -70,6 +70,7 @@
 %token KW_NOT
 %token KW_NOT_NULL
 %token KW_INDEXED
+%token KW_DEFAULT
 %token KW_AND
 %token KW_OR
 %token KW_BETWEEN
@@ -111,7 +112,7 @@
 %type <Schema> column_defs
 %type <Column> column_def
 %type <ColumnType> col_type
-%type <uint8_t> constraints
+%type <ColumnAttributes> column_attrs
 
 %type <std::vector<std::string>> ident_list
 
@@ -227,9 +228,9 @@ column_defs:
     ;
 
 column_def:
-      ident col_type constraints
+      ident col_type column_attrs
         {
-            $$ = Column{std::move($1), $2, $3};
+            $$ = Column{std::move($1), $2, $3.constraints, std::move($3.default_value)};
         }
     ;
 
@@ -245,25 +246,37 @@ col_type:
         }
     ;
 
-constraints:
+column_attrs:
       %empty
         {
-            $$ = NONE;
+            $$ = ColumnAttributes{};
         }
 
-    | constraints KW_NOT_NULL
+    | column_attrs KW_NOT_NULL
         {
-            $$ = static_cast<std::uint8_t>($1 | NOT_NULL);
+            $1.constraints = static_cast<std::uint8_t>($1.constraints | NOT_NULL);
+            $$ = std::move($1);
         }
 
-    | constraints KW_NOT NULL_LIT
+    | column_attrs KW_NOT NULL_LIT
         {
-            $$ = static_cast<std::uint8_t>($1 | NOT_NULL);
+            $1.constraints = static_cast<std::uint8_t>($1.constraints | NOT_NULL);
+            $$ = std::move($1);
         }
 
-    | constraints KW_INDEXED
+    | column_attrs KW_INDEXED
         {
-            $$ = static_cast<std::uint8_t>($1 | INDEXED);
+            $1.constraints = static_cast<std::uint8_t>($1.constraints | INDEXED);
+            $$ = std::move($1);
+        }
+
+    | column_attrs KW_DEFAULT literal_value
+        {
+            if ($1.default_value.has_value()) {
+                throw std::runtime_error("duplicate DEFAULT modifier");
+            }
+            $1.default_value = std::move($3);
+            $$ = std::move($1);
         }
     ;
 

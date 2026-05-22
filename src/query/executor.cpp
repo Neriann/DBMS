@@ -80,6 +80,22 @@ nlohmann::json value_to_json(const Value &value) {
         value);
 }
 
+void validate_default_value(const Column &column, const Value &value) {
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+        if (column.is_not_null() || column.is_indexed()) {
+            throw std::runtime_error("DEFAULT NULL is not allowed for column '" + column.name + "'");
+        }
+        return;
+    }
+
+    if (column.type == ColumnType::INT && !std::holds_alternative<int>(value)) {
+        throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be INT");
+    }
+    if (column.type == ColumnType::STRING && !std::holds_alternative<std::string>(value)) {
+        throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
+    }
+}
+
 } // namespace
 
 // region Lifecycle
@@ -158,6 +174,12 @@ std::string Executor::exec_create_table(const CreateTableStmt &s) {
         names.insert(column.name);
     }
 
+    for (const Column &column : s.schema) {
+        if (column.default_value) {
+            validate_default_value(column, *column.default_value);
+        }
+    }
+
     db.create_table(s.table_name, s.schema);
     return ok_json("Table '" + s.table_name + "' created").dump();
 }
@@ -194,6 +216,12 @@ std::string Executor::exec_insert(const InsertStmt &s) {
         }
 
         Row row(schema.size(), nullptr);
+        for (std::size_t i = 0; i < schema.size(); ++i) {
+            if (schema[i].default_value) {
+                row[i] = *schema[i].default_value;
+            }
+        }
+
         for (std::size_t i = 0; i < input_row.size(); ++i) {
             row[static_cast<std::size_t>(column_indexes[i])] = input_row[i];
         }

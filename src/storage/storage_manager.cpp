@@ -7,12 +7,42 @@
 
 using json = nlohmann::json;
 
+namespace {
+    json value_to_schema_json(const Value &value) {
+        if (std::holds_alternative<int>(value)) {
+            return std::get<int>(value);
+        }
+        if (std::holds_alternative<std::string>(value)) {
+            return std::get<std::string>(value);
+        }
+        return nullptr;
+    }
+
+    Value value_from_schema_json(const json &j, const ColumnType type) {
+        if (j.is_null()) {
+            return nullptr;
+        }
+        if (type == ColumnType::INT) {
+            return j.get<int>();
+        }
+        if (type == ColumnType::STRING) {
+            return j.get<std::string>();
+        }
+
+        throw std::runtime_error("Corrupted schema: unknown column type");
+    }
+}
+
 void to_json(json &j, const Column &c) {
     j = json{
         {"name", c.name},
         {"type", static_cast<int>(c.type)},
         {"constraints", c.constraints}
     };
+    if (c.default_value) {
+        j["has_default"] = true;
+        j["default"] = value_to_schema_json(*c.default_value);
+    }
 }
 
 void from_json(const json &j, Column &c) {
@@ -21,6 +51,19 @@ void from_json(const json &j, Column &c) {
     j.at("type").get_to(type_val);
     c.type = static_cast<ColumnType>(type_val);
     j.at("constraints").get_to(c.constraints);
+
+    bool has_default = false;
+    if (j.contains("has_default")) {
+        j.at("has_default").get_to(has_default);
+    } else {
+        has_default = j.contains("default");
+    }
+
+    if (has_default) {
+        c.default_value = value_from_schema_json(j.at("default"), c.type);
+    } else {
+        c.default_value.reset();
+    }
 }
 
 namespace { // visible only here

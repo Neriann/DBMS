@@ -92,6 +92,11 @@ struct UseStmt {
     std::string db_name;
 };
 
+struct ColumnAttributes {
+    std::uint8_t constraints = NONE;
+    std::optional<Value> default_value;
+};
+
 struct CreateTableStmt {
     std::string db_name;
     std::string table_name;
