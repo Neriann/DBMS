@@ -59,30 +59,13 @@ A schema is a list of column descriptors. Column position is the stable identifi
 
 ### `IndexTree<tkey, tvalue, cmp>`
 
-A compile-time alias resolved by `DBMS_INDEX_TREE`:
-
-| Macro value                 | Tree             |
-|-----------------------------|------------------|
-| `DBMS_TREE_B`               | `B_tree`         |
-| `DBMS_TREE_BP`              | `BP_tree` (B+)   |
-| `DBMS_TREE_BS`              | `BS_tree` (B*)   |
-| `DBMS_TREE_BSP` *(default)* | `BSP_tree` (B*+) |
+A compile-time alias for the local `BSP_tree` (B*+ tree).
 
 ---
 
 ### `Allocator`
 
-A compile-time alias resolved by `DBMS_ALLOCATOR`:
-
-| Macro value                      | Allocator                  |
-|----------------------------------|----------------------------|
-| `DBMS_ALLOC_GLOBAL_HEAP`         | `allocator_global_heap`    |
-| `DBMS_ALLOC_BOUNDARY_TAGS`       | `allocator_boundary_tags`  |
-| `DBMS_ALLOC_BUDDIES`             | `allocator_buddies_system` |
-| `DBMS_ALLOC_SORTED_LIST`         | `allocator_sorted_list`    |
-| `DBMS_ALLOC_RB_TREE` *(default)* | `allocator_red_black_tree` |
-
-Note: non-heap allocators are initialized with 1 MiB.
+Alias for `std::pmr::unsynchronized_pool_resource`, used by the DBMS-level tree allocator.
 
 ---
 

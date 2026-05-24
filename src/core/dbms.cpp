@@ -2,12 +2,7 @@
 #include <stdexcept>
 
 DBMS::DBMS()
-#if DBMS_ALLOCATOR == DBMS_ALLOC_GLOBAL_HEAP
-    :
-#else
-    : databases_alloc_(1u << 20), // 1 MiB for now
-#endif
-      databases_(pp_allocator<DbTree::value_type>(&databases_alloc_)) {
+    : databases_(pp_allocator<DbTree::value_type>(&databases_alloc_)) {
 }
 
 void DBMS::create_database(const std::string &db_name) {

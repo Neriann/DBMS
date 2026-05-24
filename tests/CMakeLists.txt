@@ -13,6 +13,9 @@ FetchContent_MakeAvailable(googletest)
 add_executable(storage_unit_test storage/unit.cpp)
 target_link_libraries(storage_unit_test PRIVATE dbms_core gtest_main)
 
+add_executable(b_star_plus_tree_test core/b_star_plus_tree.cpp)
+target_link_libraries(b_star_plus_tree_test PRIVATE dbms_b_star_plus_tree gtest_main)
+
 add_executable(access_logger_test server/unit.cpp ../src/server/access_logger.cpp ../src/server/telemetry.cpp)
 target_include_directories(access_logger_test PRIVATE ../include)
 target_link_libraries(access_logger_test PRIVATE Crow::Crow nlohmann_json::nlohmann_json gtest_main)
@@ -23,5 +26,6 @@ target_include_directories(query_tests PRIVATE ${gtest_SOURCE_DIR}/include)
 
 include(GoogleTest)
 gtest_discover_tests(storage_unit_test)
+gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)
