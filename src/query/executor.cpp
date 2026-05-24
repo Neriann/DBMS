@@ -414,7 +414,12 @@ bool Executor::eval_condition(
                 throw std::runtime_error("LIKE expects a string right operand");
             }
 
-            return std::regex_match(std::get<std::string>(lhs), std::regex(std::get<std::string>(rhs)));
+            try {
+                const std::regex pattern(std::get<std::string>(rhs));
+                return std::regex_match(std::get<std::string>(lhs), pattern);
+            } catch (const std::regex_error &) {
+                throw std::runtime_error("Invalid LIKE regex pattern");
+            }
         }
 
         case ConditionKind::And:
