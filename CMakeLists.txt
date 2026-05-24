@@ -71,7 +71,7 @@ add_subdirectory(libs/sysprog/associative_container)
 
 # Bison & Flex
 FLEX_TARGET(Lexer src/query/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.cpp)
-BISON_TARGET(Parser src/query/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
+BISON_TARGET(Parser src/query/parser.ypp ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
         DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.hpp)
 ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
