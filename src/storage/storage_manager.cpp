@@ -1,9 +1,9 @@
 #include "storage/storage_manager.hpp"
+#include "storage/binary_io.hpp"
 
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <stdexcept>
 
 using json = nlohmann::json;
 
@@ -66,52 +66,7 @@ void from_json(const json &j, Column &c) {
     }
 }
 
-namespace { // visible only here
-    void read_safe(std::ifstream &in, char *data, const std::streamsize size) {
-        if (!in.read(data, size)) throw std::runtime_error("Corrupted table data: unexpected end of file");
-    }
-
-    void write_value(std::ofstream &out, const Value &v) {
-        const char type_idx = static_cast<char>(v.index());
-        out.write(&type_idx, sizeof(type_idx));
-
-        if (std::holds_alternative<int>(v)) {
-            const auto val = std::get<int>(v);
-            out.write(reinterpret_cast<const char *>(&val), sizeof(val));
-        } else if (std::holds_alternative<std::string>(v)) {
-            const auto &val = std::get<std::string>(v);
-            const std::size_t len = val.size();
-            out.write(reinterpret_cast<const char *>(&len), sizeof(len));
-            out.write(val.data(), static_cast<std::streamsize>(len));
-        }
-    }
-
-    Value read_value(std::ifstream &in) {
-        char type_idx{};
-        read_safe(in, &type_idx, sizeof(type_idx));
-
-        if (type_idx == 0) {
-            int val{};
-            read_safe(in, reinterpret_cast<char *>(&val), sizeof(val));
-            return val;
-        }
-        if (type_idx == 1) {
-            std::size_t len{};
-            read_safe(in, reinterpret_cast<char *>(&len), sizeof(len));
-            std::string val(len, '\0');
-            read_safe(in, val.data(), static_cast<std::streamsize>(len));
-            return val;
-        }
-        if (type_idx == 2) {
-            return nullptr;
-        }
-
-        throw std::runtime_error("Corrupted table data: unknown value type");
-    }
-}
-
-StorageManager::StorageManager(std::filesystem::path data_dir)
-    : data_dir_(std::move(data_dir)) {
+StorageManager::StorageManager(std::filesystem::path data_dir): data_dir_(std::move(data_dir)) {
     if (!fs::exists(data_dir_)) {
         fs::create_directories(data_dir_);
     }
@@ -167,12 +122,7 @@ void StorageManager::load(DBMS &dbms) const {
             std::ifstream tdf(t_path, std::ios::binary);
             bool deleted{};
             while (tdf.read(reinterpret_cast<char *>(&deleted), sizeof(deleted))) {
-                Row row;
-                row.reserve(schema.size());
-                for (std::size_t i = 0; i < schema.size(); ++i) {
-                    row.push_back(read_value(tdf));
-                }
-
+                auto row = storage::read_row(tdf, schema.size());
                 table.restore_row(std::move(row), deleted);
             }
         }
@@ -214,7 +164,7 @@ void StorageManager::save_database(const Database &db) const {
 }
 
 void StorageManager::save_table(const Database &db, const std::string &table_name, const Table &table) const {
-    const auto db_name = db.name();
+    const auto& db_name = db.name();
 
     const auto s_path = schema_path(db_name);
     json j;
@@ -271,9 +221,7 @@ void StorageManager::write_table_data(const std::string &db_name, const std::str
         const bool deleted = table.is_deleted(id);
         tdf.write(reinterpret_cast<const char *>(&deleted), sizeof(deleted));
 
-        for (const auto &v: data[id]) {
-            write_value(tdf, v);
-        }
+        storage::write_row(tdf, data[id]);
     }
 }
 // endregion helpers implementation
