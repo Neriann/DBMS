@@ -22,6 +22,9 @@ target_link_libraries(serializer_test PRIVATE dbms_core gtest_main)
 add_executable(pager_test storage/pager.cpp)
 target_link_libraries(pager_test PRIVATE dbms_core gtest_main)
 
+add_executable(page_io_test storage/page_io.cpp)
+target_link_libraries(page_io_test PRIVATE dbms_core gtest_main)
+
 add_executable(b_star_plus_tree_test core/b_star_plus_tree.cpp)
 target_link_libraries(b_star_plus_tree_test PRIVATE dbms_b_star_plus_tree gtest_main)
 
@@ -38,6 +41,7 @@ gtest_discover_tests(storage_unit_test)
 gtest_discover_tests(binary_io_test)
 gtest_discover_tests(serializer_test)
 gtest_discover_tests(pager_test)
+gtest_discover_tests(page_io_test)
 gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)

@@ -41,6 +41,7 @@ set(CORE_SOURCES
         src/query/executor.cpp
         src/query/query_runner.cpp
         src/storage/binary_io.cpp
+        src/storage/page_io.cpp
         src/storage/pager.cpp
         src/storage/serializer.cpp
         src/storage/storage_manager.cpp
