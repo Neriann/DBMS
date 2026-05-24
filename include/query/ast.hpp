@@ -6,21 +6,25 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <variant>
 
 //region expressions and conditions
 
 enum class ExprKind {
     Literal,
-    Column
+    Column,
+    UnaryMinus
 };
 
 /**
- * @note Value literal used if kind == Literal, std::string column used if kind == Column
+ * @note Value literal used if kind == Literal, std::string column used if kind == Column,
+ *       std::shared_ptr<Expr> operand used if kind == UnaryMinus
  */
 struct Expr {
     ExprKind kind;
     Value literal;
     std::string column;
+    std::shared_ptr<Expr> operand;
 };
 
 enum class CmpOp {
@@ -46,11 +50,11 @@ struct BetweenPredicate {
 };
 
 /**
- * @note lhs LIKE regex_pattern
+ * @note lhs LIKE rhs, where rhs evaluates to a regex string
  */
 struct LikePredicate {
     Expr lhs;
-    std::string pattern;
+    Expr rhs;
 };
 
 enum class ConditionKind {
@@ -86,6 +90,11 @@ struct DropDatabaseStmt {
 
 struct UseStmt {
     std::string db_name;
+};
+
+struct ColumnAttributes {
+    std::uint8_t constraints = NONE;
+    std::optional<Value> default_value;
 };
 
 struct CreateTableStmt {
