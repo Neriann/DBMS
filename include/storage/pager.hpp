@@ -7,21 +7,20 @@
 #include <span>
 
 namespace storage {
+    class Pager {
+    public:
+        explicit Pager(std::filesystem::path path);
 
-class Pager {
-public:
-    explicit Pager(std::filesystem::path  path);
+        [[nodiscard]] page_id_t allocate_page() const;
 
-    static page_id_t allocate_page();
+        void read_page(page_id_t id, std::span<std::byte, page_size> out) const;
 
-    static void read_page(page_id_t id, std::span<std::byte, page_size> out) ;
-    static void write_page(page_id_t id, std::span<const std::byte, page_size> data);
+        void write_page(page_id_t id, std::span<const std::byte, page_size> data) const;
 
-    [[nodiscard]] const std::filesystem::path& path() const noexcept;
+        [[nodiscard]] const std::filesystem::path &path() const noexcept;
 
-private:
-    std::filesystem::path path_;
-    mutable std::fstream file_;
-};
-
+    private:
+        std::filesystem::path path_;
+        mutable std::fstream file_;
+    };
 } // namespace storage
