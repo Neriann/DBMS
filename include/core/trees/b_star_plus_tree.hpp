@@ -6,8 +6,13 @@
 #include <stack>
 #include <pp_allocator.h>
 #include <associative_container.h>
+#include <storage/page.hpp>
+#include <storage/pager.hpp>
+#include <storage/serializer.hpp>
+#include <not_implemented.h>
 #include <initializer_list>
 #include <optional>
+#include <filesystem>
 
 template<typename TKey, typename TValue, comparator<TKey> compare = std::less<TKey>, std::size_t t = 5>
 class BSP_tree final : compare {
@@ -17,6 +22,36 @@ public:
     using value_type = tree_data_type_const;
 
 private:
+    enum class DiskNodeType : std::uint8_t {
+        leaf,
+        internal
+    };
+
+    struct DiskTreeHeader {
+        std::uint64_t magic{};
+        std::uint32_t version{};
+        storage::page_id_t root_page{storage::invalid_page_id};
+        storage::page_id_t first_leaf{storage::invalid_page_id};
+        storage::page_id_t next_page{storage::first_data_page_id};
+        std::uint64_t size{};
+    };
+
+    struct DiskNodeHeader {
+        DiskNodeType type{DiskNodeType::leaf};
+        std::uint16_t keys_count{};
+        storage::page_id_t self{storage::invalid_page_id};
+        storage::page_id_t parent{storage::invalid_page_id};
+    };
+
+    struct DiskLeafNode {
+        DiskNodeHeader header{};
+        storage::page_id_t next_leaf{storage::invalid_page_id};
+    };
+
+    struct DiskInternalNode {
+        DiskNodeHeader header{};
+    };
+
     static constexpr size_t minimum_keys_in_root = 1;
     static constexpr size_t maximum_keys_in_root = 4 * t - 1;
 
@@ -56,6 +91,8 @@ private:
     pp_allocator<value_type> _allocator;
     BSPTreeNodeBase *_root;
     size_t _size;
+    std::optional<storage::Pager> _pager;
+    DiskTreeHeader _disk_header{};
 
     pp_allocator<value_type> get_allocator() const noexcept;
 
@@ -317,6 +354,28 @@ private:
     TKey subtree_first_key(BSPTreeNodeBase *node) const;
 
     static void collect_leaves_inorder(BSPTreeNodeBase *n, std::vector<BSPTreeNodeTerm *> &out);
+
+    // region disk helpers declaration
+
+    void open_disk_storage(const std::filesystem::path &path);
+
+    void load_disk_header();
+
+    void write_disk_header();
+
+    storage::page_id_t allocate_disk_node(DiskNodeType type);
+
+    storage::page_id_t find_disk_leaf(const TKey &key) const;
+
+    DiskLeafNode read_disk_leaf(storage::page_id_t page) const;
+
+    void write_disk_leaf(storage::page_id_t page, const DiskLeafNode &node);
+
+    DiskInternalNode read_disk_internal(storage::page_id_t page) const;
+
+    void write_disk_internal(storage::page_id_t page, const DiskInternalNode &node);
+
+    // endregion disk helpers declaration
 
     // endregion helpers declaration
 };
@@ -1002,9 +1061,8 @@ bool BSP_tree<TKey, TValue, compare, t>::borrow_leaf_right(BSPTreeNodeMiddle *pa
 
 template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
 bool BSP_tree<TKey, TValue, compare, t>::borrow_leaf_left(BSPTreeNodeMiddle *parent, size_t i) {
-    if (i == 0) {
-        return false;
-    }
+    if (i == 0) return false;
+
     auto *L = static_cast<BSPTreeNodeTerm *>(parent->_pointers[i - 1]);
     auto *cur = static_cast<BSPTreeNodeTerm *>(parent->_pointers[i]);
     if (L->_data.size() <= minimum_keys_in_node) {
@@ -1287,5 +1345,60 @@ void BSP_tree<TKey, TValue, compare, t>::relink_leaves() {
         leaves.back()->_next = nullptr;
     }
 }
+
+// region BSP_tree disk helpers implementations
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+void BSP_tree<TKey, TValue, compare, t>::open_disk_storage(const std::filesystem::path &/*path*/) {
+    throw not_implemented("BSP_tree::open_disk_storage(const std::filesystem::path&)", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+void BSP_tree<TKey, TValue, compare, t>::load_disk_header() {
+    throw not_implemented("BSP_tree::load_disk_header()", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+void BSP_tree<TKey, TValue, compare, t>::write_disk_header() {
+    throw not_implemented("BSP_tree::write_disk_header()", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+storage::page_id_t BSP_tree<TKey, TValue, compare, t>::allocate_disk_node(const DiskNodeType /*type*/) {
+    throw not_implemented("BSP_tree::allocate_disk_node(DiskNodeType)", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+storage::page_id_t BSP_tree<TKey, TValue, compare, t>::find_disk_leaf(const TKey &/*key*/) const {
+    throw not_implemented("BSP_tree::find_disk_leaf(const TKey&) const", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+BSP_tree<TKey, TValue, compare, t>::DiskLeafNode BSP_tree<TKey, TValue, compare, t>::read_disk_leaf(
+    const storage::page_id_t /*page*/) const {
+    throw not_implemented("BSP_tree::read_disk_leaf(storage::page_id_t) const", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+void BSP_tree<TKey, TValue, compare, t>::write_disk_leaf(const storage::page_id_t /*page*/,
+                                                         const DiskLeafNode &/*node*/) {
+    throw not_implemented("BSP_tree::write_disk_leaf(storage::page_id_t, const DiskLeafNode&)",
+                          "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+BSP_tree<TKey, TValue, compare, t>::DiskInternalNode BSP_tree<TKey, TValue, compare, t>::read_disk_internal(
+    const storage::page_id_t /*page*/) const {
+    throw not_implemented("BSP_tree::read_disk_internal(storage::page_id_t) const", "disk storage skeleton");
+}
+
+template<typename TKey, typename TValue, comparator<TKey> compare, std::size_t t>
+void BSP_tree<TKey, TValue, compare, t>::write_disk_internal(const storage::page_id_t /*page*/,
+                                                             const DiskInternalNode &/*node*/) {
+    throw not_implemented("BSP_tree::write_disk_internal(storage::page_id_t, const DiskInternalNode&)",
+                          "disk storage skeleton");
+}
+
+// endregion BSP_tree disk helpers implementations
 
 // endregion BSP_tree helpers implementations

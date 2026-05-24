@@ -40,6 +40,8 @@ set(CORE_SOURCES
         src/query/ast.cpp
         src/query/executor.cpp
         src/query/query_runner.cpp
+        src/storage/binary_io.cpp
+        src/storage/pager.cpp
         src/storage/storage_manager.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
