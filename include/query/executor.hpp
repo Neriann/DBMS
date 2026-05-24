@@ -93,7 +93,7 @@ private:
     /**
      * @param cond condition tree to evaluate
      * @param row row to test
-     * @param schema schema of the table
+     * @param column_indexes column name to row index lookup
      * @return true if the row satisfies the condition
      */
     static bool eval_condition(
@@ -104,7 +104,7 @@ private:
     /**
      * @param expr expression to evaluate
      * @param row row providing column values
-     * @param schema schema of the table
+     * @param column_indexes column name to row index lookup
      * @return resulting Value
      */
     static Value eval_expr(
