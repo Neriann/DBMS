@@ -96,6 +96,101 @@ void validate_default_value(const Column &column, const Value &value) {
     }
 }
 
+std::string aggregate_function_name(const AggregateFunction function) {
+    switch (function) {
+        case AggregateFunction::Sum:
+            return "SUM";
+        case AggregateFunction::Count:
+            return "COUNT";
+        case AggregateFunction::Avg:
+            return "AVG";
+    }
+
+    throw std::runtime_error("Unknown aggregate function");
+}
+
+std::string select_item_output_name(const SelectItem &item) {
+    if (!item.alias.empty()) {
+        return item.alias;
+    }
+    if (item.kind == SelectItemKind::Column) {
+        return item.name;
+    }
+    if (item.count_star) {
+        return aggregate_function_name(item.aggregate) + "(*)";
+    }
+    return aggregate_function_name(item.aggregate) + "(" + item.name + ")";
+}
+
+void ensure_unique_output_names(const std::vector<std::string> &output_names) {
+    std::set<std::string> seen_output_names;
+    for (const std::string &output_name : output_names) {
+        if (!seen_output_names.insert(output_name).second) {
+            throw std::invalid_argument("Duplicate projected output name: " + output_name);
+        }
+    }
+}
+
+nlohmann::json eval_aggregate(
+    const SelectItem &item,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::vector<Row> &data,
+    const std::vector<RowID> &row_ids) {
+    if (item.kind != SelectItemKind::Aggregate) {
+        throw std::runtime_error("Internal error: expected aggregate select item");
+    }
+
+    if (item.aggregate == AggregateFunction::Count && item.count_star) {
+        return row_ids.size();
+    }
+
+    const int column_index = require_column(column_indexes, item.name);
+    const std::size_t index = static_cast<std::size_t>(column_index);
+
+    if (item.aggregate == AggregateFunction::Count) {
+        std::size_t count = 0;
+        for (const RowID id : row_ids) {
+            if (!std::holds_alternative<std::nullptr_t>(data[id][index])) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    if (schema[index].type != ColumnType::INT) {
+        throw std::runtime_error(aggregate_function_name(item.aggregate)
+            + " expects an INT column: '" + item.name + "'");
+    }
+
+    long long sum = 0;
+    std::size_t count = 0;
+    for (const RowID id : row_ids) {
+        const Value &value = data[id][index];
+        if (std::holds_alternative<std::nullptr_t>(value)) {
+            continue;
+        }
+        if (!std::holds_alternative<int>(value)) {
+            throw std::runtime_error(aggregate_function_name(item.aggregate)
+                + " expects an INT column: '" + item.name + "'");
+        }
+        sum += std::get<int>(value);
+        ++count;
+    }
+
+    if (count == 0) {
+        return nullptr;
+    }
+    if (item.aggregate == AggregateFunction::Sum) {
+        return sum;
+    }
+    if (item.aggregate == AggregateFunction::Avg) {
+        return static_cast<double>(sum) / static_cast<double>(count);
+    }
+
+    throw std::runtime_error("Unknown aggregate function");
+}
+
 } // namespace
 
 // region Lifecycle
@@ -303,6 +398,18 @@ std::string Executor::exec_select(const SelectStmt &s) {
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
 
+    std::vector<RowID> matching_ids;
+    const std::vector<Row> &data = table.data();
+    for (RowID id = 0; id < data.size(); ++id) {
+        if (table.is_deleted(id)) {
+            continue;
+        }
+        if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
+            continue;
+        }
+        matching_ids.push_back(id);
+    }
+
     std::vector<int> selected_indexes;
     std::vector<std::string> output_names;
 
@@ -314,31 +421,52 @@ std::string Executor::exec_select(const SelectStmt &s) {
             output_names.push_back(schema[i].name);
         }
     } else {
-        selected_indexes.reserve(s.columns.size());
-        output_names.reserve(s.columns.size());
-        for (const SelectColumn &column : s.columns) {
-            selected_indexes.push_back(require_column(column_indexes, column.name));
-            output_names.push_back(column.alias.empty() ? column.name : column.alias);
+        bool has_aggregate = false;
+        bool has_column = false;
+        for (const SelectItem &item : s.items) {
+            has_aggregate = has_aggregate || item.kind == SelectItemKind::Aggregate;
+            has_column = has_column || item.kind == SelectItemKind::Column;
+        }
+
+        if (has_aggregate && has_column) {
+            throw std::invalid_argument("Cannot mix aggregate and non-aggregate select items without GROUP BY");
+        }
+
+        if (has_aggregate) {
+            output_names.reserve(s.items.size());
+            for (const SelectItem &item : s.items) {
+                output_names.push_back(select_item_output_name(item));
+            }
+            ensure_unique_output_names(output_names);
+
+            nlohmann::json object = nlohmann::json::object();
+            for (std::size_t i = 0; i < s.items.size(); ++i) {
+                object[output_names[i]] = eval_aggregate(
+                    s.items[i],
+                    schema,
+                    column_indexes,
+                    data,
+                    matching_ids);
+            }
+
+            nlohmann::json result = nlohmann::json::array();
+            result.push_back(std::move(object));
+            return result.dump();
+        }
+
+        selected_indexes.reserve(s.items.size());
+        output_names.reserve(s.items.size());
+        for (const SelectItem &item : s.items) {
+            selected_indexes.push_back(require_column(column_indexes, item.name));
+            output_names.push_back(select_item_output_name(item));
         }
     }
 
-    std::set<std::string> seen_output_names;
-    for (const std::string &output_name : output_names) {
-        if (!seen_output_names.insert(output_name).second) {
-            throw std::invalid_argument("Duplicate projected output name: " + output_name);
-        }
-    }
+    ensure_unique_output_names(output_names);
 
     std::vector<Row> rows;
-    const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
-        if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
-            continue;
-        }
-
+    rows.reserve(matching_ids.size());
+    for (const RowID id : matching_ids) {
         Row projected;
         projected.reserve(selected_indexes.size());
         for (const int index : selected_indexes) {
