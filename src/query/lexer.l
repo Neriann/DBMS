@@ -2,15 +2,16 @@
 #include "query/scanner.hpp"
 
 #include <cctype>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 
 static bool has_uniform_case(const std::string& text) {
-    uint8_t flags = 0;
+    std::uint8_t flags = 0;
 
-    constexpr uint8_t LOWER = 1 << 0;
-    constexpr uint8_t UPPER = 1 << 1;
+    constexpr std::uint8_t LOWER = 1 << 0;
+    constexpr std::uint8_t UPPER = 1 << 1;
 
     for (unsigned char ch : text) {
         if (std::islower(ch)) {
