@@ -1,5 +1,5 @@
 #include "storage/storage_manager.hpp"
-
+#include "core/string_interner.hpp"
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -35,11 +35,11 @@ namespace { // visible only here
         if (std::holds_alternative<int>(v)) {
             const auto val = std::get<int>(v);
             out.write(reinterpret_cast<const char *>(&val), sizeof(val));
-        } else if (std::holds_alternative<std::string>(v)) {
-            const auto &val = std::get<std::string>(v);
-            const std::size_t len = val.size();
+        } else if (std::holds_alternative<InternedString>(v)) {
+            const auto &val = std::get<InternedString>(v);
+            const std::size_t len = val->size();
             out.write(reinterpret_cast<const char *>(&len), sizeof(len));
-            out.write(val.data(), static_cast<std::streamsize>(len));
+            out.write(val->data(), static_cast<std::streamsize>(len));
         }
     }
 
@@ -57,7 +57,7 @@ namespace { // visible only here
             read_safe(in, reinterpret_cast<char *>(&len), sizeof(len));
             std::string val(len, '\0');
             read_safe(in, val.data(), static_cast<std::streamsize>(len));
-            return val;
+            return StringInterner::instance().intern(val);
         }
         if (type_idx == 2) {
             return nullptr;

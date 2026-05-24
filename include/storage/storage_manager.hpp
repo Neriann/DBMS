@@ -2,6 +2,7 @@
 #include "../core/dbms.hpp"
 #include <filesystem>
 #include <string>
+#include "core/string_interner.hpp"
 
 namespace fs = std::filesystem;
 

@@ -1,14 +1,23 @@
 #include "core/value.hpp"
+#include "core/string_interner.hpp"
+#include <variant>
 
-bool ValueComparator::operator()(const Value &a, const Value &b) const {
-    if (a.index() != b.index()) {
-        return a.index() < b.index();
+bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
+    if (lhs.index() != rhs.index()) {
+        return lhs.index() < rhs.index();
     }
-    if (std::holds_alternative<int>(a)) {
-        return std::get<int>(a) < std::get<int>(b);
+
+    if (std::holds_alternative<int>(lhs)) {
+        return std::get<int>(lhs) < std::get<int>(rhs);
     }
-    if (std::holds_alternative<std::string>(a)) {
-        return std::get<std::string>(a) < std::get<std::string>(b);
+
+    if (std::holds_alternative<InternedString>(lhs)) {
+        const auto& l = std::get<InternedString>(lhs);
+        const auto& r = std::get<InternedString>(rhs);
+
+        if (!l || !r) return l < r;
+
+        return *l < *r;
     }
 
     return false;
