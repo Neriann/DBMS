@@ -1,14 +1,17 @@
 #pragma once
 #include "table.hpp"
+#include "trees/b_star_plus_tree.hpp"
+#include <filesystem>
 #include <memory>
 #include <string>
-
-#include "index_tree.hpp"
+#include <vector>
 
 class Database {
     friend class StorageManager;
 public:
     explicit Database(std::string name);
+
+    Database(std::string name, std::filesystem::path index_path);
 
     /**
      *
@@ -53,7 +56,12 @@ public:
     [[nodiscard]] bool has_table(const std::string &table_name) const noexcept;
 
 private:
-    std::string name_;
+    static std::filesystem::path default_index_path(const std::string &name);
 
-    IndexTree<std::string, std::unique_ptr<Table> > tables_;
+    std::string name_;
+    std::filesystem::path index_path_;
+    std::filesystem::path table_indexes_dir_;
+
+    BSP_tree<std::string, std::size_t> tables_;
+    std::vector<std::unique_ptr<Table> > table_storage_;
 };

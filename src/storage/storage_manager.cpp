@@ -142,14 +142,14 @@ void StorageManager::save(const DBMS &dbms) const {
     }
 
     for (auto db_it = dbms.databases_.begin(); db_it != dbms.databases_.end(); ++db_it) {
-        const auto &db = *db_it->second;
+        const auto &db = *dbms.database_storage_.at(db_it->second);
 
         save_database(db);
         write_schema(db);
 
         for (auto table_it = db.tables_.begin(); table_it != db.tables_.end(); ++table_it) {
             const auto &table_name = table_it->first;
-            const auto &table = *table_it->second;
+            const auto &table = *db.table_storage_.at(table_it->second);
 
             write_table_data(db.name(), table_name, table);
         }
@@ -204,7 +204,7 @@ void StorageManager::drop_table(const std::string &db_name, const std::string &t
 void StorageManager::write_schema(const Database &db) const {
     json j;
     for (auto table_it = db.tables_.begin(); table_it != db.tables_.end(); ++table_it) {
-        j[table_it->first] = table_it->second->schema();
+        j[table_it->first] = db.table_storage_.at(table_it->second)->schema();
     }
 
     std::ofstream out(schema_path(db.name()));

@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace storage {
     namespace detail {
@@ -28,6 +29,8 @@ namespace storage {
         static void write(std::span<std::byte> out, const T &value);
 
         static T read(std::span<const std::byte> in);
+
+        static std::vector<std::byte> to_bytes(const T &value);
     };
 
     template<typename T>
@@ -52,11 +55,20 @@ namespace storage {
         return value;
     }
 
+    template<typename T>
+    std::vector<std::byte> Serializer<T>::to_bytes(const T &value) {
+        std::vector<std::byte> bytes(sizeof(T));
+        write(bytes, value);
+        return bytes;
+    }
+
     template<>
     struct Serializer<std::string> {
         static void write(std::span<std::byte> out, const std::string &value);
 
         static std::string read(std::span<const std::byte> in);
+
+        static std::vector<std::byte> to_bytes(const std::string &value);
     };
 
     template<>
@@ -64,6 +76,8 @@ namespace storage {
         static void write(std::span<std::byte> out, const Value &value);
 
         static Value read(std::span<const std::byte> in);
+
+        static std::vector<std::byte> to_bytes(const Value &value);
     };
 
     template<>
@@ -71,5 +85,7 @@ namespace storage {
         static void write(std::span<std::byte> out, const Row &row);
 
         static Row read(std::span<const std::byte> in);
+
+        static std::vector<std::byte> to_bytes(const Row &row);
     };
 } // namespace storage

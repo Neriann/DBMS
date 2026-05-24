@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -11,6 +12,8 @@ struct Index;
 class Table {
 public:
     explicit Table(Schema schema);
+
+    Table(Schema schema, std::filesystem::path indexes_dir);
 
     ~Table();
 
@@ -70,6 +73,7 @@ private:
     friend class StorageManager;
 
     Schema schema_;
+    std::filesystem::path indexes_dir_;
     std::vector<Row> data_;
     std::vector<bool> deleted_; // tombstone flags
 

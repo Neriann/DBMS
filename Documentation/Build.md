@@ -5,4 +5,4 @@ cmake -B build
 cmake --build build
 ```
 
-The DBMS currently uses the local B*+-tree alias in `include/core/index_tree.hpp`.
+The DBMS currently uses the local B*+-tree implementation in `include/core/trees/b_star_plus_tree.hpp`.

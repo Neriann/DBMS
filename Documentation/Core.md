@@ -20,8 +20,6 @@ DBMS  ->  Database  ─>  Table (Schema / Row / Index)
 | `include/core/schema.hpp`     | `src/core/schema.cpp`   |
 | `include/core/row.hpp`        | *(header-only)*         |
 | `include/core/value.hpp`      | `src/core/value.cpp`    |
-| `include/core/index_tree.hpp` | *(header-only)*         |
-| `include/core/allocator.hpp`  | *(header-only)*         |
 
 ---
 
@@ -57,15 +55,9 @@ A schema is a list of column descriptors. Column position is the stable identifi
 
 ---
 
-### `IndexTree<tkey, tvalue, cmp>`
+### `BSP_tree<tkey, tvalue, cmp>`
 
-A compile-time alias for the local `BSP_tree` (B*+ tree).
-
----
-
-### `Allocator`
-
-Alias for `std::pmr::unsynchronized_pool_resource`, used by the DBMS-level tree allocator.
+A local disk-backed B*+ tree used for database, table, and column indexes.
 
 ---
 
@@ -73,7 +65,7 @@ Alias for `std::pmr::unsynchronized_pool_resource`, used by the DBMS-level tree 
 
 ### `DBMS`
 
-Holds all databases in an `IndexTree<string, unique_ptr<Database>>` and tracks the
+Holds all databases in a `BSP_tree<string, size_t>` and tracks the
 current database for use.
 
 | Method                  | Throws                            | Notes                                                                       |
@@ -89,7 +81,7 @@ current database for use.
 
 ### `Database`
 
-Owns a named collection of tables in an `IndexTree<string, unique_ptr<Table>>`.
+Owns a named collection of tables in a `BSP_tree<string, size_t>`.
 
 | Method                       | Throws                            | Notes                                   |
 |------------------------------|-----------------------------------|-----------------------------------------|

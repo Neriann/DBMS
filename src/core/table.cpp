@@ -1,23 +1,42 @@
 #include "core/table.hpp"
 #include "core/schema.hpp"
-#include "core/index_tree.hpp"
+#include "core/trees/b_star_plus_tree.hpp"
+#include <chrono>
+#include <filesystem>
 #include <ranges>
 #include <set>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 
 struct Index {
     std::size_t col_index;
-    IndexTree<Value, RowID, ValueComparator> tree;
+    BSP_tree<Value, RowID, ValueComparator> tree;
 
-    explicit Index(const std::size_t col_index) : col_index(col_index) {
+    Index(const std::size_t col_index, const std::filesystem::path &path) : col_index(col_index), tree(path) {
     }
 };
 
-Table::Table(Schema schema) : schema_(std::move(schema)) {
+namespace {
+    std::filesystem::path make_runtime_indexes_dir() {
+        static std::size_t counter = 0;
+        const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+        auto path = std::filesystem::temp_directory_path() / "dbms_bsp_tree_indexes";
+        path /= "table_" + std::to_string(stamp) + "_" + std::to_string(++counter);
+        std::filesystem::create_directories(path);
+        return path;
+    }
+}
+
+Table::Table(Schema schema) : Table(std::move(schema), make_runtime_indexes_dir()) {
+}
+
+Table::Table(Schema schema, std::filesystem::path indexes_dir)
+    : schema_(std::move(schema)), indexes_dir_(std::move(indexes_dir)) {
+    std::filesystem::create_directories(indexes_dir_);
     for (size_t i = 0; i < schema_.size(); ++i) {
         if (schema_[i].is_indexed()) {
-            indexes_[schema_[i].name] = std::make_unique<Index>(i);
+            indexes_[schema_[i].name] = std::make_unique<Index>(i, indexes_dir_ / (schema_[i].name + ".idx"));
         }
     }
 }

@@ -26,7 +26,7 @@ add_executable(page_io_test storage/page_io.cpp)
 target_link_libraries(page_io_test PRIVATE dbms_core gtest_main)
 
 add_executable(b_star_plus_tree_test core/b_star_plus_tree.cpp)
-target_link_libraries(b_star_plus_tree_test PRIVATE dbms_b_star_plus_tree gtest_main)
+target_link_libraries(b_star_plus_tree_test PRIVATE dbms_core gtest_main)
 
 add_executable(access_logger_test server/unit.cpp ../src/server/access_logger.cpp ../src/server/telemetry.cpp)
 target_include_directories(access_logger_test PRIVATE ../include)

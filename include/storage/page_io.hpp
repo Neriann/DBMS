@@ -4,6 +4,7 @@
 #include "serializer.hpp"
 
 #include <span>
+#include <vector>
 
 namespace storage {
     class PageWriter {
@@ -13,10 +14,15 @@ namespace storage {
         template<typename T>
         void write_trivial(const T &value);
 
+        template<typename... Ts>
+        void write_trivial_many(const Ts &...values);
+
         template<typename T>
         void write_serialized(const T &value, std::size_t slot_size);
 
         void write_bytes(std::span<const std::byte> bytes);
+
+        void write_sized_bytes(std::span<const std::byte> bytes);
 
         [[nodiscard]] std::size_t offset() const noexcept;
 
@@ -36,10 +42,15 @@ namespace storage {
         template<typename T>
         [[nodiscard]] T read_trivial();
 
+        template<typename... Ts>
+        void read_trivial_into(Ts &...values);
+
         template<typename T>
         [[nodiscard]] T read_serialized(std::size_t slot_size);
 
         void read_bytes(std::span<std::byte> out);
+
+        [[nodiscard]] std::vector<std::byte> read_sized_bytes();
 
         [[nodiscard]] std::size_t offset() const noexcept;
 
@@ -57,6 +68,11 @@ namespace storage {
         write_serialized(value, sizeof(T));
     }
 
+    template<typename... Ts>
+    void PageWriter::write_trivial_many(const Ts &...values) {
+        (write_trivial(values), ...);
+    }
+
     template<typename T>
     void PageWriter::write_serialized(const T &value, const std::size_t slot_size) {
         check_available(slot_size);
@@ -67,6 +83,11 @@ namespace storage {
     template<typename T>
     T PageReader::read_trivial() {
         return read_serialized<T>(sizeof(T));
+    }
+
+    template<typename... Ts>
+    void PageReader::read_trivial_into(Ts &...values) {
+        ((values = read_trivial<Ts>()), ...);
     }
 
     template<typename T>
