@@ -86,3 +86,76 @@ TEST(AccessLogger, FallsBackToRemoteIpWhenClientIdHeaderIsMissing) {
     EXPECT_EQ(entry.at("client_id"), "10.0.0.15");
     EXPECT_EQ(entry.at("status_code"), 400);
 }
+
+TEST(TelemetryCollector, CalculatesWindowedMetrics) {
+    using clock = TelemetryCollector::clock;
+    constexpr auto now = clock::time_point{std::chrono::seconds(1000)};
+
+    const TelemetryCollector telemetry;
+    telemetry.record_request(now - std::chrono::seconds(20) - std::chrono::milliseconds(40),
+                             now - std::chrono::seconds(20),
+                             200);
+    telemetry.record_request(now - std::chrono::milliseconds(910),
+                             now - std::chrono::milliseconds(900),
+                             200);
+    telemetry.record_request(now - std::chrono::milliseconds(520),
+                             now - std::chrono::milliseconds(500),
+                             500);
+    telemetry.record_request(now - std::chrono::milliseconds(430),
+                             now - std::chrono::milliseconds(400),
+                             404);
+
+    const auto metrics = telemetry.snapshot(now);
+
+    EXPECT_DOUBLE_EQ(metrics.current_rps, 3.0);
+    EXPECT_DOUBLE_EQ(metrics.average_rps_10m, 4.0 / 600.0);
+    EXPECT_DOUBLE_EQ(metrics.max_rps_10m, 3.0);
+    EXPECT_DOUBLE_EQ(metrics.average_processing_ms_10s, 20.0);
+    EXPECT_EQ(metrics.requests_1m, 4U);
+    EXPECT_EQ(metrics.error_count_1m, 2U);
+    EXPECT_DOUBLE_EQ(metrics.error_rate_1m, 0.5);
+}
+
+TEST(TelemetryCollector, IgnoresRequestsOutsideTenMinuteWindow) {
+    using clock = TelemetryCollector::clock;
+    constexpr auto now = clock::time_point{std::chrono::minutes(20)};
+
+    const TelemetryCollector telemetry;
+    telemetry.record_request(now - std::chrono::minutes(11) - std::chrono::milliseconds(1),
+                             now - std::chrono::minutes(11),
+                             500);
+
+    const auto [current_rps
+        ,average_rps_10m
+        ,max_rps_10m
+        ,average_processing_ms_10s
+        ,error_count_1m
+        ,error_rate_1m
+        ,requests_1m] = telemetry.snapshot(now);
+
+    EXPECT_DOUBLE_EQ(current_rps, 0.0);
+    EXPECT_DOUBLE_EQ(average_rps_10m, 0.0);
+    EXPECT_DOUBLE_EQ(max_rps_10m, 0.0);
+    EXPECT_DOUBLE_EQ(average_processing_ms_10s, 0.0);
+    EXPECT_EQ(requests_1m, 0u);
+    EXPECT_EQ(error_count_1m, 0u);
+    EXPECT_DOUBLE_EQ(error_rate_1m, 0.0);
+}
+
+TEST(TelemetryCollector, SerializesMetricsAsJson) {
+    using clock = TelemetryCollector::clock;
+    constexpr auto now = clock::time_point{std::chrono::seconds(100)};
+
+    const TelemetryCollector telemetry;
+    telemetry.record_request(now - std::chrono::milliseconds(5), now, 200);
+
+    const auto body = nlohmann::json::parse(telemetry.snapshot_json(now));
+
+    EXPECT_TRUE(body.contains("current_rps"));
+    EXPECT_TRUE(body.contains("average_rps_10m"));
+    EXPECT_TRUE(body.contains("max_rps_10m"));
+    EXPECT_TRUE(body.contains("average_processing_ms_10s"));
+    EXPECT_TRUE(body.contains("error_count_1m"));
+    EXPECT_TRUE(body.contains("error_rate_1m"));
+    EXPECT_TRUE(body.contains("requests_1m"));
+}

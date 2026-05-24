@@ -42,10 +42,23 @@ public:
 
     /**
      *
-     * @param id
-     * @param row replace the row at `id` and update all affected indexes, throws std::out_of_range / std::invalid_argument as appropriate.
+     * @param rows rows to append atomically
+     * @return RowIDs of appended rows, throws std::invalid_argument on constraint violations.
+     */
+    std::vector<RowID> insert_many(const std::vector<Row> &rows);
+
+    /**
+     *
+     * @param id row id
+     * @param row replace the row at id, update all affected indexes, throws std::out_of_range / std::invalid_argument
      */
     void update(RowID id, Row row);
+
+    /**
+     *
+     * @param updates row replacements to apply atomically
+     */
+    void update_many(std::vector<std::pair<RowID, Row> > updates);
 
     /**
      *

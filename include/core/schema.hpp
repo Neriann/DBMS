@@ -1,5 +1,7 @@
 #pragma once
+#include "value.hpp"
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,6 +20,7 @@ struct Column {
     std::string name;
     ColumnType type;
     std::uint8_t constraints = NONE;
+    std::optional<Value> default_value;
 
     /**
      *

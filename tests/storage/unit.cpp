@@ -1,5 +1,6 @@
 #include "storage/storage_manager.hpp"
 #include "core/string_interner.hpp"
+#include "core/table.hpp"
 #include "core/dbms.hpp"
 #include "core/database.hpp"
 #include <gtest/gtest.h>
@@ -186,4 +187,62 @@ TEST(StorageManager, SavePrunesDroppedDatabases) {
             )
         );
     }
+
+TEST(Table, InsertManyDuplicateIndexedValues) {
+    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+
+    EXPECT_THROW(
+        {
+        table.insert_many(std::vector<Row>{
+            {1, std::string("Ann")}
+            ,{1, std::string("Duplicate")}
+            });
+        },
+        std::invalid_argument
+    );
+
+    EXPECT_TRUE(table.data().empty());
 }
+
+TEST(Table, UpdateManyDuplicateFinalIndexedValues) {
+    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+    table.insert_many({
+        {1, std::string("Ann")},
+        {2, std::string("Bob")}
+    });
+
+    EXPECT_THROW(
+        {
+        table.update_many(std::vector<std::pair<RowID, Row> >{
+            {0, {3, std::string("Ann")}},
+            {1, {3, std::string("Bob")}}
+            });
+        },
+        std::invalid_argument
+    );
+
+    ASSERT_EQ(table.data().size(), 2);
+    EXPECT_EQ(std::get<int>(table.data()[0][0]), 1);
+    EXPECT_EQ(std::get<int>(table.data()[1][0]), 2);
+}
+
+TEST(Table, UpdateManyAllowsIndexedValueSwap) {
+    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+    table.insert_many({
+        {1, std::string("Ann")},
+        {2, std::string("Bob")}
+    });
+
+    EXPECT_NO_THROW(
+        {
+        table.update_many(std::vector<std::pair<RowID, Row> >{
+            {0, {2, std::string("Ann")}},
+            {1, {1, std::string("Bob")}}
+            });
+        }
+    );
+
+    EXPECT_EQ(std::get<int>(table.data()[0][0]), 2);
+    EXPECT_EQ(std::get<int>(table.data()[1][0]), 1);
+}
+>>>>>>> main
