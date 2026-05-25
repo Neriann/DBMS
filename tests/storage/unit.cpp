@@ -245,4 +245,3 @@ TEST(Table, UpdateManyAllowsIndexedValueSwap) {
     EXPECT_EQ(std::get<int>(table.data()[0][0]), 2);
     EXPECT_EQ(std::get<int>(table.data()[1][0]), 1);
 }
->>>>>>> main

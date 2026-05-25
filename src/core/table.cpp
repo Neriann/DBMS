@@ -1,7 +1,6 @@
 #include "core/table.hpp"
 #include "core/schema.hpp"
 #include "core/index_tree.hpp"
-#include "core/string_interner.hpp"
 #include <ranges>
 #include <set>
 #include <stdexcept>
@@ -9,16 +8,22 @@
 
 struct Index {
     std::size_t col_index;
+    ValueComparator comparator;
     IndexTree<Value, RowID, ValueComparator> tree;
 
-    explicit Index(const std::size_t col_index) : col_index(col_index) {
+    Index(const std::size_t col_index, StringPool* pool)
+        : col_index(col_index),
+          comparator(pool),
+          tree(comparator) {
     }
 };
 
-Table::Table(Schema schema) : schema_(std::move(schema)) {
-    for (size_t i = 0; i < schema_.size(); ++i) {
+Table::Table(Schema schema, StringPool* pool)
+    : schema_(std::move(schema)),
+      pool_(pool) {
+        for (size_t i = 0; i < schema_.size(); ++i) {
         if (schema_[i].is_indexed()) {
-            indexes_[schema_[i].name] = std::make_unique<Index>(i);
+            indexes_[schema_[i].name] = std::make_unique<Index>(i, pool_);
         }
     }
 }
@@ -63,7 +68,8 @@ std::vector<RowID> Table::insert_many(const std::vector<Row> &rows) {
     }
 
     for (auto &[col_name, index]: indexes_) {
-        std::set<Value, ValueComparator> batch_values;
+        std::set<Value, ValueComparator>
+            batch_values{ValueComparator(pool_)};
         for (const auto &row: rows) {
             if (const auto &value = row[index->col_index];
                 !batch_values.insert(value).second || index->tree.contains(value)) {
@@ -131,7 +137,8 @@ void Table::update_many(std::vector<std::pair<RowID, Row> > updates) {
     }
 
     for (auto &[col_name, index]: indexes_) {
-        std::set<Value, ValueComparator> final_values;
+        std::set<Value, ValueComparator>
+            final_values{ValueComparator(pool_)};
         for (const auto &row: updates | std::views::values) {
             if (const auto &value = row[index->col_index]; !final_values.insert(value).second) {
                 throw std::invalid_argument("Duplicate value in INDEXED column '" + col_name + "'");

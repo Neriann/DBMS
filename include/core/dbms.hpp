@@ -1,6 +1,7 @@
 #pragma once
 #include "database.hpp"
 #include "allocator.hpp"
+#include "string_pool.hpp"
 #include <memory>
 #include <string>
 
@@ -9,8 +10,11 @@ using DbAllocator = Allocator;
 
 class DBMS {
     friend class StorageManager;
+    StringPool string_pool_;
 public:
     DBMS();
+
+    StringPool &string_pool() { return string_pool_; }
 
     /**
      *

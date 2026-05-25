@@ -2,8 +2,7 @@
 #include <variant>
 #include <string>
 #include <cstddef>
-
-using InternedString = const std::string*;
+#include "stringpool.hpp"
 
 using Value = std::variant<
     int,
@@ -11,6 +10,20 @@ using Value = std::variant<
     std::nullptr_t
 >;
 
-struct ValueComparator {
-    bool operator()(const Value &a, const Value &b) const;
+class ValueComparator {
+public:
+    explicit ValueComparator(const StringPool& pool)
+        : pool_(&pool) {
+    }
+
+    ValueComparator(const ValueComparator&) = default;
+    ValueComparator(ValueComparator&&) = default;
+
+    ValueComparator& operator=(const ValueComparator&) = default;
+    ValueComparator& operator=(ValueComparator&&) = default;
+
+    bool operator()(const Value& lhs, const Value& rhs) const;
+
+private:
+    const StringPool* pool_;
 };

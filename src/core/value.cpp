@@ -1,5 +1,5 @@
 #include "core/value.hpp"
-#include "core/string_interner.hpp"
+#include "core/stringpool.hpp"
 #include <variant>
 
 bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
@@ -15,9 +15,14 @@ bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
         const auto& l = std::get<InternedString>(lhs);
         const auto& r = std::get<InternedString>(rhs);
 
-        if (!l || !r) return l < r;
+        const std::string& ls = pool_.get(l.id);
+        const std::string& rs = pool_.get(r.id);
 
-        return *l < *r;
+        return ls < rs;
+    }
+
+    if (std::holds_alternative<std::nullptr_t>(lhs)) {
+        return false; // NULLs equal or last
     }
 
     return false;

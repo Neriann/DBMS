@@ -8,6 +8,7 @@
 class Executor {
 public:
     explicit Executor(DBMS &dbms);
+    StringPool &string_pool() { return dbms_.string_pool(); }
 
     /**
      *
@@ -117,7 +118,11 @@ private:
      * @param col_names column names used as JSON object keys
      * @return JSON array string
      */
-    static std::string rows_to_json(const std::vector<Row> &rows, const std::vector<std::string> &col_names);
+    std::string rows_to_json(
+        const std::vector<Row> &rows,
+        const std::vector<std::string> &col_names);
 
+    nlohmann::json value_to_json(const Value &value);
+    int compare_values(const Value &lhs, const Value &rhs);
     //endregion helpers
 };

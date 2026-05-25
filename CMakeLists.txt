@@ -77,7 +77,7 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
 set(CORE_SOURCES
         src/core/value.cpp
-        src/core/string_interner.cpp
+        src/core/stringpool.cpp
         src/core/schema.cpp
         src/core/table.cpp
         src/core/database.cpp
