@@ -1,5 +1,4 @@
 #include "storage/storage_manager.hpp"
-#include "core/string_interner.hpp"
 #include "core/table.hpp"
 #include "core/dbms.hpp"
 #include "core/database.hpp"
@@ -7,7 +6,7 @@
 #include <filesystem>
 
 static InternedString S(const std::string& s) {
-    return StringInterner::instance().intern(s);
+    return InternedString{global_string_pool().intern(s)};
 }
 
 TEST(StorageManager, LoadSave) {
@@ -48,10 +47,14 @@ TEST(StorageManager, LoadSave) {
 
         ASSERT_EQ(t1_load.data().size(), 2);
         EXPECT_EQ(std::get<int>(t1_load.data()[0][0]), 42);
-        EXPECT_EQ(*std::get<InternedString>(t1_load.data()[0][1]), "hello");
+        const InternedString& is1 = std::get<InternedString>(t1_load.data()[0][1]);
+        const std::string& str1 = global_string_pool().get(is1.id);
+        EXPECT_EQ(str1, "hello");
 
         EXPECT_EQ(std::get<int>(t1_load.data()[1][0]), 100);
-        EXPECT_EQ(*std::get<InternedString>(t1_load.data()[1][1]), "world");
+        const InternedString& is2 = std::get<InternedString>(t1_load.data()[1][1]);
+        const std::string& str2 = global_string_pool().get(is2.id);
+        EXPECT_EQ(str2, "world");
     }
 }
 
@@ -149,10 +152,14 @@ TEST(StorageManager, SaveEntireDbms) {
 
         ASSERT_EQ(users.data().size(), 1);
         EXPECT_EQ(std::get<int>(users.data()[0][0]), 1);
-        EXPECT_EQ(*std::get<InternedString>(users.data()[0][1]), "Sebastian");
+        const InternedString& is1 = std::get<InternedString>(users.data()[0][1]);
+        const std::string& str1 = global_string_pool().get(is1.id);
+        EXPECT_EQ(str1, "Sebastian");
 
         ASSERT_EQ(notes.data().size(), 1);
-        EXPECT_EQ(*std::get<InternedString>(notes.data()[0][0]), "hello");
+        const InternedString& is2 = std::get<InternedString>(notes.data()[0][0]);
+        const std::string& str2 = global_string_pool().get(is2.id);
+        EXPECT_EQ(str2, "hello");
         EXPECT_EQ(std::get<int>(notes.data()[0][1]), 10);
     }
 }
@@ -187,17 +194,22 @@ TEST(StorageManager, SavePrunesDroppedDatabases) {
             )
         );
     }
+}
 
 TEST(Table, InsertManyDuplicateIndexedValues) {
-    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+    Schema schema = {
+        {"id", ColumnType::INT, INDEXED},
+        {"name", ColumnType::STRING, NONE}
+    };
+    Table table(schema, nullptr);
+
+    std::vector<Row> rows = {
+        {1, InternedString{global_string_pool().intern("John")}},
+        {2, InternedString{global_string_pool().intern("Jane")}}
+    };
 
     EXPECT_THROW(
-        {
-        table.insert_many(std::vector<Row>{
-            {1, std::string("Ann")}
-            ,{1, std::string("Duplicate")}
-            });
-        },
+        table.insert_many(rows),
         std::invalid_argument
     );
 
@@ -205,19 +217,22 @@ TEST(Table, InsertManyDuplicateIndexedValues) {
 }
 
 TEST(Table, UpdateManyDuplicateFinalIndexedValues) {
-    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+    Schema schema = {
+        {"id", ColumnType::INT, INDEXED},
+        {"name", ColumnType::STRING, NONE}
+    };
+    Table table(schema, nullptr);
+
     table.insert_many({
-        {1, std::string("Ann")},
-        {2, std::string("Bob")}
+        {1, InternedString{global_string_pool().intern("Ann")}},
+        {2, InternedString{global_string_pool().intern("Bob")}}
     });
 
     EXPECT_THROW(
-        {
-        table.update_many(std::vector<std::pair<RowID, Row> >{
-            {0, {3, std::string("Ann")}},
-            {1, {3, std::string("Bob")}}
-            });
-        },
+        table.update_many({
+            {0, {3, InternedString{global_string_pool().intern("Ann")}}},
+            {1, {3, InternedString{global_string_pool().intern("Bob")}}}
+        }),
         std::invalid_argument
     );
 
@@ -227,17 +242,21 @@ TEST(Table, UpdateManyDuplicateFinalIndexedValues) {
 }
 
 TEST(Table, UpdateManyAllowsIndexedValueSwap) {
-    Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
+    Schema schema = {
+        {"id", ColumnType::INT, INDEXED},
+        {"name", ColumnType::STRING, NONE}
+    };
+    Table table(schema, nullptr);
     table.insert_many({
-        {1, std::string("Ann")},
-        {2, std::string("Bob")}
+        {1, InternedString{global_string_pool().intern("Ann")}},
+        {2, InternedString{global_string_pool().intern("Bob")}}
     });
 
     EXPECT_NO_THROW(
         {
         table.update_many(std::vector<std::pair<RowID, Row> >{
-            {0, {2, std::string("Ann")}},
-            {1, {1, std::string("Bob")}}
+            {0, {2, InternedString{global_string_pool().intern("Ann")}}},
+            {1, {1, InternedString{global_string_pool().intern("Bob")}}}
             });
         }
     );

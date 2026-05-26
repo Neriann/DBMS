@@ -1,5 +1,4 @@
 #include "storage/storage_manager.hpp"
-#include "core/string_interner.hpp"
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -12,8 +11,10 @@ namespace {
         if (std::holds_alternative<int>(value)) {
             return std::get<int>(value);
         }
-        if (std::holds_alternative<std::string>(value)) {
-            return std::get<std::string>(value);
+        if (std::holds_alternative<InternedString>(value)) {
+            const InternedString& interned = std::get<InternedString>(value);
+            const std::string& str = global_string_pool().get(interned.id);
+            return str;
         }
         return nullptr;
     }
@@ -26,7 +27,9 @@ namespace {
             return j.get<int>();
         }
         if (type == ColumnType::STRING) {
-            return j.get<std::string>();
+            std::string str = j.get<std::string>();
+            StringId id = global_string_pool().intern(str);  // нужен доступ к пулу строк
+            return InternedString{id};
         }
 
         throw std::runtime_error("Corrupted schema: unknown column type");
@@ -79,10 +82,9 @@ namespace { // visible only here
             const auto val = std::get<int>(v);
             out.write(reinterpret_cast<const char *>(&val), sizeof(val));
         } else if (std::holds_alternative<InternedString>(v)) {
-            const auto &val = std::get<InternedString>(v);
-            const std::size_t len = val->size();
-            out.write(reinterpret_cast<const char *>(&len), sizeof(len));
-            out.write(val->data(), static_cast<std::streamsize>(len));
+            const InternedString& interned = std::get<InternedString>(v);
+            const std::string& str = global_string_pool().get(interned.id);  // нужен пул
+            out.write(str.data(), static_cast<std::streamsize>(str.size()));
         }
     }
 
@@ -100,7 +102,7 @@ namespace { // visible only here
             read_safe(in, reinterpret_cast<char *>(&len), sizeof(len));
             std::string val(len, '\0');
             read_safe(in, val.data(), static_cast<std::streamsize>(len));
-            return StringInterner::instance().intern(val);
+            return InternedString{global_string_pool().intern(val)};
         }
         if (type_idx == 2) {
             return nullptr;

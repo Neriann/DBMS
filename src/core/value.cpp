@@ -15,14 +15,15 @@ bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
         const auto& l = std::get<InternedString>(lhs);
         const auto& r = std::get<InternedString>(rhs);
 
-        const std::string& ls = pool_.get(l.id);
-        const std::string& rs = pool_.get(r.id);
+        if (l.id == r.id) {
+            return false;
+        }
 
-        return ls < rs;
-    }
+        if (!pool_) {
+            return l.id < r.id;
+        }
 
-    if (std::holds_alternative<std::nullptr_t>(lhs)) {
-        return false; // NULLs equal or last
+        return pool_->get(l.id) < pool_->get(r.id);
     }
 
     return false;

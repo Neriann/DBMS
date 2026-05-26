@@ -8,7 +8,7 @@
 class Database {
     friend class StorageManager;
 public:
-    explicit Database(std::string name);
+    explicit Database(std::string name, StringPool* pool);
 
     /**
      *
@@ -54,6 +54,7 @@ public:
 
 private:
     std::string name_;
+    StringPool* pool_;
 
     IndexTree<std::string, std::unique_ptr<Table> > tables_;
 };

@@ -15,7 +15,7 @@ void DBMS::create_database(const std::string &db_name) {
         throw std::runtime_error("Database '" + db_name + "' already exists");
     }
 
-    databases_.insert({db_name, std::make_unique<Database>(db_name)});
+    databases_.insert({db_name, std::make_unique<Database>(db_name, &string_pool_)});
 }
 
 void DBMS::drop_database(const std::string &db_name) {

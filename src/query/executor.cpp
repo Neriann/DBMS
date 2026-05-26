@@ -1,6 +1,5 @@
 #include "query/executor.hpp"
 
-#include <nlohmann/json.hpp>
 #include <limits>
 #include <regex>
 #include <set>
@@ -8,8 +7,6 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
-
-namespace {
 
 template <class... Ts>
 struct Overloaded : Ts... {
@@ -68,8 +65,8 @@ int Executor::compare_values(const Value &lhs, const Value &rhs) {
     const InternedString l_id = std::get<InternedString>(lhs);
     const InternedString r_id = std::get<InternedString>(rhs);
 
-    const std::string& l = string_pool.get(l_id.id);
-    const std::string& r = string_pool.get(r_id.id);
+    const std::string& l = global_string_pool().get(l_id.id);
+    const std::string& r = global_string_pool().get(r_id.id);
 
     return (l > r) - (l < r);
 }
@@ -78,7 +75,9 @@ nlohmann::json Executor::value_to_json(const Value &value) {
     return std::visit(
         Overloaded{
             [](const int v) -> nlohmann::json { return v; },
-            [](const InternedString& v) -> nlohmann::json { return string_pool.get(v.id); },
+            [this](const InternedString& v) -> nlohmann::json {
+                return global_string_pool().get(v.id);
+            },
             [](std::nullptr_t) -> nlohmann::json { return nullptr; }
         },
         value);
@@ -99,8 +98,6 @@ void validate_default_value(const Column &column, const Value &value) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
-
-} // namespace
 
 // region Lifecycle
 
@@ -212,7 +209,7 @@ std::string Executor::exec_insert(const InsertStmt &s) {
         column_indexes.push_back(require_column(schema_indexes, column));
     }
 
-    StringPool& pool = dbms_.string_pool();
+    StringPool& pool = global_string_pool();
     std::vector<Row> rows;
     rows.reserve(s.rows.size());
     for (const Row &input_row : s.rows) {
@@ -402,7 +399,7 @@ bool Executor::eval_condition(
             const Value lhs = eval_expr(cond.between->lhs, row, column_indexes);
             const Value lo = eval_expr(cond.between->lo, row, column_indexes);
             const Value hi = eval_expr(cond.between->hi, row, column_indexes);
-            return compare_values(lhs, lo) >= 0 && compare_values(lhs, hi) < 0;
+            return  compare_values(lhs, lo) >= 0 && compare_values(lhs, hi) < 0;
         }
 
         case ConditionKind::Like: {
@@ -420,21 +417,14 @@ bool Executor::eval_condition(
             }
 
             try {
-                const InternedString lhs_id =
-                    std::get<InternedString>(lhs);
+                const InternedString lhs_id = std::get<InternedString>(lhs);
+                const InternedString rhs_id = std::get<InternedString>(rhs);
 
-                const InternedString rhs_id =
-                    std::get<InternedString>(rhs);
-                    const std::string& lhs_str =
-                    string_pool.get(lhs_id.id);
+                const std::string& lhs_str = global_string_pool().get(lhs_id.id);
+                const std::string& rhs_str = global_string_pool().get(rhs_id.id);
 
-                const std::string& rhs_str =
-                    string_pool.get(rhs_id.id);
-                    const std::regex pattern(rhs_str);
-
+                const std::regex pattern(rhs_str);
                 return std::regex_match(lhs_str, pattern);
-                const std::regex pattern(std::get<std::string>(rhs));
-                return std::regex_match(std::get<std::string>(lhs), pattern);
             } catch (const std::regex_error &) {
                 throw std::runtime_error("Invalid LIKE regex pattern");
             }
@@ -511,11 +501,12 @@ std::string Executor::rows_to_json(const std::vector<Row> &rows, const std::vect
     return result.dump();
 }
 
-Value intern_value(const Value& v, StringPool& pool)
+Value Executor::intern_value(const Value& v, StringPool& pool)
 {
-    if (std::holds_alternative<std::string>(v)) {
-        const auto& s = std::get<std::string>(v);
-        return InternedString{pool.intern(s)};
+    if (std::holds_alternative<InternedString>(v)) {
+        InternedString str_id = std::get<InternedString>(v);
+        const std::string& str = global_string_pool().get(str_id.id);
+        return InternedString{pool.intern(str)};
     }
     return v;
 }

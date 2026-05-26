@@ -1,7 +1,9 @@
 #include "core/database.hpp"
 #include <stdexcept>
 
-Database::Database(std::string name) : name_(std::move(name)) {
+Database::Database(std::string name, StringPool* pool)
+    : name_(std::move(name)),
+      pool_(pool) {
 }
 
 const std::string &Database::name() const noexcept {
@@ -13,7 +15,7 @@ void Database::create_table(const std::string &table_name, Schema schema) {
         throw std::runtime_error("Table '" + table_name + "' already exists");
     }
 
-    tables_.insert({table_name, std::make_unique<Table>(std::move(schema))});
+    tables_.insert({table_name, std::make_unique<Table>(std::move(schema), pool_)});
 }
 
 void Database::drop_table(const std::string &table_name) {

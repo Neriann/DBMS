@@ -3,13 +3,12 @@
 #include "../core/dbms.hpp"
 #include <string>
 #include <unordered_map>
+#include <nlohmann/json.hpp>
 
 
 class Executor {
 public:
     explicit Executor(DBMS &dbms);
-    StringPool &string_pool() { return dbms_.string_pool(); }
-
     /**
      *
      * @param stmt Statement
@@ -97,7 +96,7 @@ private:
      * @param column_indexes column name to row index lookup
      * @return true if the row satisfies the condition
      */
-    static bool eval_condition(
+    bool eval_condition(
         const Condition &cond,
         const Row &row,
         const std::unordered_map<std::string, int> &column_indexes);
@@ -108,7 +107,7 @@ private:
      * @param column_indexes column name to row index lookup
      * @return resulting Value
      */
-    static Value eval_expr(
+    Value eval_expr(
         const Expr &expr,
         const Row &row,
         const std::unordered_map<std::string, int> &column_indexes);
@@ -124,5 +123,6 @@ private:
 
     nlohmann::json value_to_json(const Value &value);
     int compare_values(const Value &lhs, const Value &rhs);
+    Value intern_value(const Value& v, StringPool& pool);
     //endregion helpers
 };
