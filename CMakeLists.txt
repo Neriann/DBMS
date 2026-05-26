@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
 project(DBMS LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(FLEX 2.6 REQUIRED)
@@ -77,7 +77,6 @@ ADD_FLEX_BISON_DEPENDENCY(Lexer Parser)
 
 set(CORE_SOURCES
         src/core/value.cpp
-        src/core/stringpool.cpp
         src/core/schema.cpp
         src/core/table.cpp
         src/core/database.cpp

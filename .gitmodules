@@ -1,6 +1,6 @@
 [submodule "libs/sysprog"]
 	path = libs/sysprog
-	url = https://github.com/las-tochka/FIIT_SP.git
+	url = https://github.com/ariollex/sysprog-labs
 [submodule "libs/json"]
 	path = libs/json
 	url = https://github.com/nlohmann/json.git

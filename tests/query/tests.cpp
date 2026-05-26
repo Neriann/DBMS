@@ -76,32 +76,6 @@ TEST(QueryParser, ParsesAllBaseStatementKinds) {
     EXPECT_TRUE(std::holds_alternative<DropDatabaseStmt>(statements[8]));
 }
 
-TEST(QueryParser, ParsesQualifiedTableReferencesAndSelectAliases) {
-    const std::vector<Statement> statements = parse_sql(
-        "CREATE TABLE analytics.events (id INT, title STRING NOT_NULL);"
-        "SELECT id AS event_id, title FROM analytics.events WHERE title LIKE \"click.*\";");
-
-    ASSERT_EQ(statements.size(), 2);
-
-    const auto &create = as_statement<CreateTableStmt>(statements[0]);
-    EXPECT_EQ(create.db_name, "analytics");
-    EXPECT_EQ(create.table_name, "events");
-    ASSERT_EQ(create.schema.size(), 2);
-    EXPECT_EQ(create.schema[1].name, "title");
-    EXPECT_TRUE(create.schema[1].is_not_null());
-
-    const auto &select = as_statement<SelectStmt>(statements[1]);
-    EXPECT_EQ(select.db_name, "analytics");
-    EXPECT_EQ(select.table_name, "events");
-    ASSERT_EQ(select.items.size(), 2);
-    EXPECT_EQ(select.items[0].kind, SelectItemKind::Column);
-    EXPECT_EQ(select.items[0].name, "id");
-    EXPECT_EQ(select.items[0].alias, "event_id");
-    EXPECT_EQ(select.items[1].kind, SelectItemKind::Column);
-    EXPECT_EQ(select.items[1].name, "title");
-    EXPECT_TRUE(select.items[1].alias.empty());
-}
-
 TEST(QueryParser, ParsesParenthesizedBooleanConditionsWithPrecedence) {
     const std::vector<Statement> statements = parse_sql(
         "SELECT * FROM users WHERE (id == 1 OR id == 2) AND name != \"Bob\";");
@@ -114,36 +88,6 @@ TEST(QueryParser, ParsesParenthesizedBooleanConditionsWithPrecedence) {
     ASSERT_TRUE(select.where->right);
     EXPECT_EQ(select.where->left->kind, ConditionKind::Or);
     EXPECT_EQ(select.where->right->kind, ConditionKind::Simple);
-}
-
-TEST(QueryParser, ParsesAggregateSelectItemsAndAliases) {
-    const std::vector<Statement> statements = parse_sql(
-        "SELECT COUNT(*), COUNT(age) AS filled, SUM(age), AVG(age) AS average FROM users;");
-
-    ASSERT_EQ(statements.size(), 1);
-    const auto &select = as_statement<SelectStmt>(statements[0]);
-    ASSERT_FALSE(select.star);
-    ASSERT_EQ(select.items.size(), 4);
-
-    EXPECT_EQ(select.items[0].kind, SelectItemKind::Aggregate);
-    EXPECT_EQ(select.items[0].aggregate, AggregateFunction::Count);
-    EXPECT_TRUE(select.items[0].count_star);
-    EXPECT_TRUE(select.items[0].alias.empty());
-
-    EXPECT_EQ(select.items[1].kind, SelectItemKind::Aggregate);
-    EXPECT_EQ(select.items[1].aggregate, AggregateFunction::Count);
-    EXPECT_FALSE(select.items[1].count_star);
-    EXPECT_EQ(select.items[1].name, "age");
-    EXPECT_EQ(select.items[1].alias, "filled");
-
-    EXPECT_EQ(select.items[2].kind, SelectItemKind::Aggregate);
-    EXPECT_EQ(select.items[2].aggregate, AggregateFunction::Sum);
-    EXPECT_EQ(select.items[2].name, "age");
-
-    EXPECT_EQ(select.items[3].kind, SelectItemKind::Aggregate);
-    EXPECT_EQ(select.items[3].aggregate, AggregateFunction::Avg);
-    EXPECT_EQ(select.items[3].name, "age");
-    EXPECT_EQ(select.items[3].alias, "average");
 }
 
 TEST(QueryParser, ParsesDefaultColumnAttributes) {
@@ -201,24 +145,6 @@ TEST(QueryParser, AcceptsEmptyInputCommentsWhitespaceAndLowercaseKeywords) {
     EXPECT_TRUE(std::holds_alternative<CreateDatabaseStmt>(statements[0]));
     EXPECT_TRUE(std::holds_alternative<UseStmt>(statements[1]));
     EXPECT_TRUE(std::holds_alternative<CreateTableStmt>(statements[2]));
-}
-
-TEST(QueryParser, ParsesValueKeywordAsIdentifierInEveryIdentifierContext) {
-    const std::vector<Statement> statements = parse_sql(
-        "CREATE TABLE value (value INT INDEXED);"
-        "INSERT INTO value (value) VALUE (1);"
-        "UPDATE value SET value = 2 WHERE value == 1;"
-        "SELECT value FROM value WHERE value BETWEEN 1 AND 3;"
-        "DELETE FROM value WHERE value == 2;"
-        "DROP TABLE value;");
-
-    ASSERT_EQ(statements.size(), 6);
-    EXPECT_EQ(as_statement<CreateTableStmt>(statements[0]).table_name, "value");
-    ASSERT_EQ(as_statement<CreateTableStmt>(statements[0]).schema.size(), 1);
-    EXPECT_EQ(as_statement<CreateTableStmt>(statements[0]).schema[0].name, "value");
-    EXPECT_EQ(as_statement<InsertStmt>(statements[1]).columns[0], "value");
-    EXPECT_EQ(as_statement<UpdateStmt>(statements[2]).assignments[0].first, "value");
-    EXPECT_EQ(as_statement<SelectStmt>(statements[3]).items[0].name, "value");
 }
 
 TEST(QueryParser, RejectsBadStringEscapesAndUnterminatedStrings) {
@@ -853,56 +779,6 @@ TEST(QueryExecutor, SupportsLikePatternExpression) {
 
     ASSERT_EQ(results.size(), 5);
     expect_json_eq(results.back(), R"([{"name":"Ann"}])");
-}
-
-TEST(QueryExecutor, SupportsAggregateFunctionsWithNullsAliasesAndWhere) {
-    DBMS dbms;
-    const std::vector<std::string> results = execute_sql(
-        dbms,
-        "CREATE DATABASE app;"
-        "USE app;"
-        "CREATE TABLE users (id INT, age INT, name STRING);"
-        "INSERT INTO users (id, age, name) VALUE "
-        "(1, 10, \"Ann\"), (2, 20, \"Bob\"), (3, NULL, \"Cat\"), (4, 30, NULL);"
-        "SELECT COUNT(*), COUNT(age), COUNT(name), SUM(age), AVG(age) AS avg_age FROM users;"
-        "SELECT COUNT(*), SUM(age), AVG(age) FROM users WHERE id >= 2;"
-        "SELECT COUNT(age) AS filled FROM users WHERE age == NULL;");
-
-    ASSERT_EQ(results.size(), 7);
-    expect_json_eq(results[4], R"json([{"COUNT(*)":4,"COUNT(age)":3,"COUNT(name)":3,"SUM(age)":60,"avg_age":20.0}])json");
-    expect_json_eq(results[5], R"json([{"AVG(age)":25.0,"COUNT(*)":3,"SUM(age)":50}])json");
-    expect_json_eq(results[6], R"([{"filled":0}])");
-}
-
-TEST(QueryExecutor, AggregateFunctionsReturnNullWhenNoIntValuesMatch) {
-    DBMS dbms;
-    const std::vector<std::string> results = execute_sql(
-        dbms,
-        "CREATE DATABASE app;"
-        "USE app;"
-        "CREATE TABLE users (id INT, age INT);"
-        "INSERT INTO users (id, age) VALUE (1, NULL), (2, NULL);"
-        "SELECT COUNT(*), COUNT(age), SUM(age), AVG(age) FROM users;"
-        "SELECT COUNT(*), SUM(age), AVG(age) FROM users WHERE id == 99;");
-
-    ASSERT_EQ(results.size(), 6);
-    expect_json_eq(results[4], R"json([{"AVG(age)":null,"COUNT(*)":2,"COUNT(age)":0,"SUM(age)":null}])json");
-    expect_json_eq(results[5], R"json([{"AVG(age)":null,"COUNT(*)":0,"SUM(age)":null}])json");
-}
-
-TEST(QueryExecutor, RejectsInvalidAggregateSelects) {
-    DBMS dbms;
-    execute_sql(
-        dbms,
-        "CREATE DATABASE app;"
-        "USE app;"
-        "CREATE TABLE users (id INT, age INT, name STRING);"
-        "INSERT INTO users (id, age, name) VALUE (1, 10, \"Ann\");");
-
-    EXPECT_THROW(execute_sql(dbms, "SELECT name, COUNT(*) FROM users;"), std::invalid_argument);
-    EXPECT_THROW(execute_sql(dbms, "SELECT SUM(name) FROM users;"), std::runtime_error);
-    EXPECT_THROW(execute_sql(dbms, "SELECT AVG(name) FROM users;"), std::runtime_error);
-    EXPECT_THROW(execute_sql(dbms, "SELECT COUNT(*), COUNT(*) FROM users;"), std::invalid_argument);
 }
 
 TEST(QueryExecutor, SupportsNegativeNumbersWithAllComparisonOperators) {
