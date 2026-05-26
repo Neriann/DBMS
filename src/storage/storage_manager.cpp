@@ -81,10 +81,26 @@ namespace { // visible only here
         if (std::holds_alternative<int>(v)) {
             const auto val = std::get<int>(v);
             out.write(reinterpret_cast<const char *>(&val), sizeof(val));
-        } else if (std::holds_alternative<InternedString>(v)) {
-            const InternedString& interned = std::get<InternedString>(v);
-            const std::string& str = global_string_pool().get(interned.id);  // нужен пул
-            out.write(str.data(), static_cast<std::streamsize>(str.size()));
+        }
+        else if (std::holds_alternative<InternedString>(v)) {
+            const InternedString& interned =
+                std::get<InternedString>(v);
+
+            const std::string& str =
+                global_string_pool().get(interned.id);
+
+            const std::size_t len = str.size();
+
+            // ВОТ ЭТОГО НЕ ХВАТАЛО
+            out.write(
+                reinterpret_cast<const char*>(&len),
+                sizeof(len)
+            );
+
+            out.write(
+                str.data(),
+                static_cast<std::streamsize>(len)
+            );
         }
     }
 

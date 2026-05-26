@@ -15,10 +15,6 @@ bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
         const auto& l = std::get<InternedString>(lhs);
         const auto& r = std::get<InternedString>(rhs);
 
-        if (l.id == r.id) {
-            return false;
-        }
-
         if (!pool_) {
             return l.id < r.id;
         }

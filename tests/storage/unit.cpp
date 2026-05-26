@@ -201,11 +201,12 @@ TEST(Table, InsertManyDuplicateIndexedValues) {
         {"id", ColumnType::INT, INDEXED},
         {"name", ColumnType::STRING, NONE}
     };
+
     Table table(schema, nullptr);
 
     std::vector<Row> rows = {
         {1, InternedString{global_string_pool().intern("John")}},
-        {2, InternedString{global_string_pool().intern("Jane")}}
+        {1, InternedString{global_string_pool().intern("Jane")}}
     };
 
     EXPECT_THROW(
