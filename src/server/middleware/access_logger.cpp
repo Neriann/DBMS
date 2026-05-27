@@ -1,4 +1,4 @@
-#include "server/access_logger.hpp"
+#include "server/middleware/access_logger.hpp"
 
 #include <iomanip>
 #include <nlohmann/json.hpp>
