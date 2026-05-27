@@ -3,7 +3,8 @@
 #include "core/dbms.hpp"
 #include "query/executor.hpp"
 #include "query/query_runner.hpp"
-#include "server/access_logger.hpp"
+#include "server/middleware/access_logger.hpp"
+#include "server/middleware/telemetry.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
 #include <cstdlib>
