@@ -493,8 +493,7 @@ literal_value:
 
     | STRING_LIT
         {
-            StringId id = global_string_pool().intern($1);
-            $$ = Value{InternedString{id}};
+            $$ = Value{std::move($1)};
         }
 
     | NULL_LIT

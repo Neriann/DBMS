@@ -85,6 +85,7 @@ set(CORE_SOURCES
         src/query/executor.cpp
         src/query/query_runner.cpp
         src/storage/storage_manager.cpp
+        src/core/stringpool.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )

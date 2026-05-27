@@ -10,7 +10,7 @@ struct Index;
 
 class Table {
 public:
-    explicit Table(Schema schema, StringPool* pool);
+    explicit Table(Schema schema);
 
     ~Table();
 
@@ -69,7 +69,6 @@ public:
 private:
     friend class StorageManager;
 
-    StringPool* pool_;
     Schema schema_;
     std::vector<Row> data_;
     std::vector<bool> deleted_; // tombstone flags

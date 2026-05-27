@@ -1,5 +1,6 @@
 #include "query/executor.hpp"
 
+#include <nlohmann/json.hpp>
 #include <limits>
 #include <regex>
 #include <set>
@@ -7,6 +8,8 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+
+namespace {
 
 template <class... Ts>
 struct Overloaded : Ts... {
@@ -49,7 +52,7 @@ void ensure_no_duplicate(const std::set<std::string> &names, const std::string &
     }
 }
 
-int Executor::compare_values(const Value &lhs, const Value &rhs) {
+int compare_values(const Value &lhs, const Value &rhs) {
     if (lhs.index() != rhs.index()) {
         throw std::runtime_error("Cannot compare values of different types");
     }
@@ -62,22 +65,16 @@ int Executor::compare_values(const Value &lhs, const Value &rhs) {
         return (l > r) - (l < r);
     }
 
-    const InternedString l_id = std::get<InternedString>(lhs);
-    const InternedString r_id = std::get<InternedString>(rhs);
-
-    const std::string& l = global_string_pool().get(l_id.id);
-    const std::string& r = global_string_pool().get(r_id.id);
-
+    const std::string &l = std::get<std::string>(lhs);
+    const std::string &r = std::get<std::string>(rhs);
     return (l > r) - (l < r);
 }
 
-nlohmann::json Executor::value_to_json(const Value &value) {
+nlohmann::json value_to_json(const Value &value) {
     return std::visit(
         Overloaded{
             [](const int v) -> nlohmann::json { return v; },
-            [this](const InternedString& v) -> nlohmann::json {
-                return global_string_pool().get(v.id);
-            },
+            [](const std::string &v) -> nlohmann::json { return v; },
             [](std::nullptr_t) -> nlohmann::json { return nullptr; }
         },
         value);
@@ -94,10 +91,12 @@ void validate_default_value(const Column &column, const Value &value) {
     if (column.type == ColumnType::INT && !std::holds_alternative<int>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be INT");
     }
-    if (column.type == ColumnType::STRING && !std::holds_alternative<InternedString>(value)) {
+    if (column.type == ColumnType::STRING && !std::holds_alternative<std::string>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
+
+} // namespace
 
 // region Lifecycle
 
@@ -209,7 +208,6 @@ std::string Executor::exec_insert(const InsertStmt &s) {
         column_indexes.push_back(require_column(schema_indexes, column));
     }
 
-    StringPool& pool = global_string_pool();
     std::vector<Row> rows;
     rows.reserve(s.rows.size());
     for (const Row &input_row : s.rows) {
@@ -220,12 +218,12 @@ std::string Executor::exec_insert(const InsertStmt &s) {
         Row row(schema.size(), nullptr);
         for (std::size_t i = 0; i < schema.size(); ++i) {
             if (schema[i].default_value) {
-                row[i] = intern_value(*schema[i].default_value, pool);
+                row[i] = *schema[i].default_value;
             }
         }
 
         for (std::size_t i = 0; i < input_row.size(); ++i) {
-            row[static_cast<std::size_t>(column_indexes[i])] = intern_value(input_row[i], pool);
+            row[static_cast<std::size_t>(column_indexes[i])] = input_row[i];
         }
 
         rows.push_back(std::move(row));
@@ -264,7 +262,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
 
         Row new_row = data[id];
         for (const auto &[index, expr] : assignments) {
-            new_row[index] = eval_expr(expr, data[id], column_indexes);
+            new_row[static_cast<std::size_t>(index)] = eval_expr(expr, data[id], column_indexes);
         }
         updates.emplace_back(id, std::move(new_row));
     }
@@ -399,7 +397,7 @@ bool Executor::eval_condition(
             const Value lhs = eval_expr(cond.between->lhs, row, column_indexes);
             const Value lo = eval_expr(cond.between->lo, row, column_indexes);
             const Value hi = eval_expr(cond.between->hi, row, column_indexes);
-            return  compare_values(lhs, lo) >= 0 && compare_values(lhs, hi) < 0;
+            return compare_values(lhs, lo) >= 0 && compare_values(lhs, hi) < 0;
         }
 
         case ConditionKind::Like: {
@@ -409,22 +407,16 @@ bool Executor::eval_condition(
 
             const Value lhs = eval_expr(cond.like->lhs, row, column_indexes);
             const Value rhs = eval_expr(cond.like->rhs, row, column_indexes);
-            if (!std::holds_alternative<InternedString>(lhs)) {
+            if (!std::holds_alternative<std::string>(lhs)) {
                 throw std::runtime_error("LIKE expects a string left operand");
             }
-            if (!std::holds_alternative<InternedString>(rhs)) {
+            if (!std::holds_alternative<std::string>(rhs)) {
                 throw std::runtime_error("LIKE expects a string right operand");
             }
 
             try {
-                const InternedString lhs_id = std::get<InternedString>(lhs);
-                const InternedString rhs_id = std::get<InternedString>(rhs);
-
-                const std::string& lhs_str = global_string_pool().get(lhs_id.id);
-                const std::string& rhs_str = global_string_pool().get(rhs_id.id);
-
-                const std::regex pattern(rhs_str);
-                return std::regex_match(lhs_str, pattern);
+                const std::regex pattern(std::get<std::string>(rhs));
+                return std::regex_match(std::get<std::string>(lhs), pattern);
             } catch (const std::regex_error &) {
                 throw std::runtime_error("Invalid LIKE regex pattern");
             }
@@ -499,16 +491,6 @@ std::string Executor::rows_to_json(const std::vector<Row> &rows, const std::vect
     }
 
     return result.dump();
-}
-
-Value Executor::intern_value(const Value& v, StringPool& pool)
-{
-    if (std::holds_alternative<InternedString>(v)) {
-        InternedString str_id = std::get<InternedString>(v);
-        const std::string& str = global_string_pool().get(str_id.id);
-        return InternedString{pool.intern(str)};
-    }
-    return v;
 }
 
 // endregion

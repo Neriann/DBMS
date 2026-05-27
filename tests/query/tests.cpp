@@ -106,9 +106,7 @@ TEST(QueryParser, ParsesDefaultColumnAttributes) {
     EXPECT_EQ(std::get<int>(*create.schema[0].default_value), 1);
 
     ASSERT_TRUE(create.schema[1].default_value.has_value());
-    const InternedString& is = std::get<InternedString>(*create.schema[1].default_value);
-    const std::string& str = global_string_pool().get(is.id);
-    EXPECT_EQ(str, "unknown");
+    EXPECT_EQ(std::get<std::string>(*create.schema[1].default_value), "unknown");
 
     ASSERT_TRUE(create.schema[2].default_value.has_value());
     EXPECT_TRUE(std::holds_alternative<std::nullptr_t>(*create.schema[2].default_value));

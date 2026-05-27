@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <string_view>
+#include <optional>
 #include <cstddef>
 
 using StringId = std::size_t;
@@ -13,15 +15,12 @@ struct InternedString {
     bool operator==(const InternedString& other) const {
         return id == other.id;
     }
-
     bool operator!=(const InternedString& other) const {
         return id != other.id;
     }
-
     bool operator<(const InternedString& other) const {
         return id < other.id;
     }
-
     bool operator>(const InternedString& other) const {
         return id > other.id;
     }
@@ -38,8 +37,14 @@ public:
     std::size_t size() const noexcept;
 
 private:
-    std::vector<std::string> strings_;
-    std::unordered_map<std::string, StringId> ids_;
+    struct Entry {
+        std::string value;
+        std::size_t refcount = 0;
+    };
+
+    std::vector<std::optional<Entry>> slots_;
+    std::vector<StringId> free_list_;
+    std::unordered_map<std::string_view, StringId> ids_;
 };
 
 inline StringPool& global_string_pool() {

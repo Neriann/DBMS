@@ -15,12 +15,10 @@ bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
         const auto& l = std::get<InternedString>(lhs);
         const auto& r = std::get<InternedString>(rhs);
 
-        if (!pool_) {
-            return l.id < r.id;
-        }
-
-        return pool_->get(l.id) < pool_->get(r.id);
+        // ключевая идея string interning:
+        return l.id < r.id;
     }
 
+    // nullptr == nullptr
     return false;
 }

@@ -12,9 +12,8 @@ namespace {
             return std::get<int>(value);
         }
         if (std::holds_alternative<InternedString>(value)) {
-            const InternedString& interned = std::get<InternedString>(value);
-            const std::string& str = global_string_pool().get(interned.id);
-            return str;
+            const auto &interned = std::get<InternedString>(value);
+            return global_string_pool().get(interned.id);
         }
         return nullptr;
     }
@@ -23,13 +22,14 @@ namespace {
         if (j.is_null()) {
             return nullptr;
         }
+
         if (type == ColumnType::INT) {
             return j.get<int>();
         }
+
         if (type == ColumnType::STRING) {
-            std::string str = j.get<std::string>();
-            StringId id = global_string_pool().intern(str);  // нужен доступ к пулу строк
-            return InternedString{id};
+            const std::string &str = j.get<std::string>();
+            return InternedString{global_string_pool().intern(str)};
         }
 
         throw std::runtime_error("Corrupted schema: unknown column type");
