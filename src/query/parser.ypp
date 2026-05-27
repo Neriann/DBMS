@@ -381,51 +381,27 @@ select_items:
 select_item:
       ident opt_alias
         {
-            SelectItem item;
-            item.kind = SelectItemKind::Column;
-            item.name = std::move($1);
-            item.alias = std::move($2);
-            $$ = std::move(item);
+            $$ = SelectColumn{std::move($1), std::move($2)};
         }
 
     | KW_COUNT LPAREN STAR RPAREN opt_alias
         {
-            SelectItem item;
-            item.kind = SelectItemKind::Aggregate;
-            item.aggregate = AggregateFunction::Count;
-            item.count_star = true;
-            item.alias = std::move($5);
-            $$ = std::move(item);
+            $$ = AggregateCall{AggregateFunction::Count, "", true, std::move($5)};
         }
 
     | KW_COUNT LPAREN ident RPAREN opt_alias
         {
-            SelectItem item;
-            item.kind = SelectItemKind::Aggregate;
-            item.aggregate = AggregateFunction::Count;
-            item.name = std::move($3);
-            item.alias = std::move($5);
-            $$ = std::move(item);
+            $$ = AggregateCall{AggregateFunction::Count, std::move($3), false, std::move($5)};
         }
 
     | KW_SUM LPAREN ident RPAREN opt_alias
         {
-            SelectItem item;
-            item.kind = SelectItemKind::Aggregate;
-            item.aggregate = AggregateFunction::Sum;
-            item.name = std::move($3);
-            item.alias = std::move($5);
-            $$ = std::move(item);
+            $$ = AggregateCall{AggregateFunction::Sum, std::move($3), false, std::move($5)};
         }
 
     | KW_AVG LPAREN ident RPAREN opt_alias
         {
-            SelectItem item;
-            item.kind = SelectItemKind::Aggregate;
-            item.aggregate = AggregateFunction::Avg;
-            item.name = std::move($3);
-            item.alias = std::move($5);
-            $$ = std::move(item);
+            $$ = AggregateCall{AggregateFunction::Avg, std::move($3), false, std::move($5)};
         }
     ;
 

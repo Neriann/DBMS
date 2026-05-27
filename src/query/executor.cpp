@@ -110,16 +110,22 @@ std::string aggregate_function_name(const AggregateFunction function) {
 }
 
 std::string select_item_output_name(const SelectItem &item) {
-    if (!item.alias.empty()) {
-        return item.alias;
-    }
-    if (item.kind == SelectItemKind::Column) {
-        return item.name;
-    }
-    if (item.count_star) {
-        return aggregate_function_name(item.aggregate) + "(*)";
-    }
-    return aggregate_function_name(item.aggregate) + "(" + item.name + ")";
+    return std::visit(
+        Overloaded{
+            [](const SelectColumn &column) {
+                return column.alias.empty() ? column.name : column.alias;
+            },
+            [](const AggregateCall &aggregate) {
+                if (!aggregate.alias.empty()) {
+                    return aggregate.alias;
+                }
+                if (aggregate.count_star) {
+                    return aggregate_function_name(aggregate.function) + "(*)";
+                }
+                return aggregate_function_name(aggregate.function) + "(" + aggregate.column + ")";
+            }
+        },
+        item);
 }
 
 void ensure_unique_output_names(const std::vector<std::string> &output_names) {
@@ -132,23 +138,19 @@ void ensure_unique_output_names(const std::vector<std::string> &output_names) {
 }
 
 nlohmann::json eval_aggregate(
-    const SelectItem &item,
+    const AggregateCall &aggregate,
     const Schema &schema,
     const std::unordered_map<std::string, int> &column_indexes,
     const std::vector<Row> &data,
     const std::vector<RowID> &row_ids) {
-    if (item.kind != SelectItemKind::Aggregate) {
-        throw std::runtime_error("Internal error: expected aggregate select item");
-    }
-
-    if (item.aggregate == AggregateFunction::Count && item.count_star) {
+    if (aggregate.function == AggregateFunction::Count && aggregate.count_star) {
         return row_ids.size();
     }
 
-    const int column_index = require_column(column_indexes, item.name);
+    const int column_index = require_column(column_indexes, aggregate.column);
     const std::size_t index = static_cast<std::size_t>(column_index);
 
-    if (item.aggregate == AggregateFunction::Count) {
+    if (aggregate.function == AggregateFunction::Count) {
         std::size_t count = 0;
         for (const RowID id : row_ids) {
             if (!std::holds_alternative<std::nullptr_t>(data[id][index])) {
@@ -159,8 +161,8 @@ nlohmann::json eval_aggregate(
     }
 
     if (schema[index].type != ColumnType::INT) {
-        throw std::runtime_error(aggregate_function_name(item.aggregate)
-            + " expects an INT column: '" + item.name + "'");
+        throw std::runtime_error(aggregate_function_name(aggregate.function)
+            + " expects an INT column: '" + aggregate.column + "'");
     }
 
     long long sum = 0;
@@ -171,8 +173,8 @@ nlohmann::json eval_aggregate(
             continue;
         }
         if (!std::holds_alternative<int>(value)) {
-            throw std::runtime_error(aggregate_function_name(item.aggregate)
-                + " expects an INT column: '" + item.name + "'");
+            throw std::runtime_error(aggregate_function_name(aggregate.function)
+                + " expects an INT column: '" + aggregate.column + "'");
         }
         sum += std::get<int>(value);
         ++count;
@@ -181,10 +183,10 @@ nlohmann::json eval_aggregate(
     if (count == 0) {
         return nullptr;
     }
-    if (item.aggregate == AggregateFunction::Sum) {
+    if (aggregate.function == AggregateFunction::Sum) {
         return sum;
     }
-    if (item.aggregate == AggregateFunction::Avg) {
+    if (aggregate.function == AggregateFunction::Avg) {
         return static_cast<double>(sum) / static_cast<double>(count);
     }
 
@@ -424,8 +426,8 @@ std::string Executor::exec_select(const SelectStmt &s) {
         bool has_aggregate = false;
         bool has_column = false;
         for (const SelectItem &item : s.items) {
-            has_aggregate = has_aggregate || item.kind == SelectItemKind::Aggregate;
-            has_column = has_column || item.kind == SelectItemKind::Column;
+            has_aggregate = has_aggregate || std::holds_alternative<AggregateCall>(item);
+            has_column = has_column || std::holds_alternative<SelectColumn>(item);
         }
 
         if (has_aggregate && has_column) {
@@ -442,7 +444,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
             nlohmann::json object = nlohmann::json::object();
             for (std::size_t i = 0; i < s.items.size(); ++i) {
                 object[output_names[i]] = eval_aggregate(
-                    s.items[i],
+                    std::get<AggregateCall>(s.items[i]),
                     schema,
                     column_indexes,
                     data,
@@ -457,7 +459,8 @@ std::string Executor::exec_select(const SelectStmt &s) {
         selected_indexes.reserve(s.items.size());
         output_names.reserve(s.items.size());
         for (const SelectItem &item : s.items) {
-            selected_indexes.push_back(require_column(column_indexes, item.name));
+            const SelectColumn &column = std::get<SelectColumn>(item);
+            selected_indexes.push_back(require_column(column_indexes, column.name));
             output_names.push_back(select_item_output_name(item));
         }
     }

@@ -112,6 +112,40 @@ TEST(QueryParser, ParsesDefaultColumnAttributes) {
     EXPECT_TRUE(std::holds_alternative<std::nullptr_t>(*create.schema[2].default_value));
 }
 
+TEST(QueryParser, ParsesSelectItemsAsColumnsOrAggregateCalls) {
+    const std::vector<Statement> statements = parse_sql(
+        "SELECT id AS user_id, COUNT(*), SUM(age) AS total_age, AVG(age) FROM users;");
+
+    ASSERT_EQ(statements.size(), 1);
+    const auto &select = as_statement<SelectStmt>(statements[0]);
+    ASSERT_FALSE(select.star);
+    ASSERT_EQ(select.items.size(), 4);
+
+    ASSERT_TRUE(std::holds_alternative<SelectColumn>(select.items[0]));
+    const auto &column = std::get<SelectColumn>(select.items[0]);
+    EXPECT_EQ(column.name, "id");
+    EXPECT_EQ(column.alias, "user_id");
+
+    ASSERT_TRUE(std::holds_alternative<AggregateCall>(select.items[1]));
+    const auto &count = std::get<AggregateCall>(select.items[1]);
+    EXPECT_EQ(count.function, AggregateFunction::Count);
+    EXPECT_TRUE(count.count_star);
+    EXPECT_TRUE(count.column.empty());
+
+    ASSERT_TRUE(std::holds_alternative<AggregateCall>(select.items[2]));
+    const auto &sum = std::get<AggregateCall>(select.items[2]);
+    EXPECT_EQ(sum.function, AggregateFunction::Sum);
+    EXPECT_EQ(sum.column, "age");
+    EXPECT_FALSE(sum.count_star);
+    EXPECT_EQ(sum.alias, "total_age");
+
+    ASSERT_TRUE(std::holds_alternative<AggregateCall>(select.items[3]));
+    const auto &avg = std::get<AggregateCall>(select.items[3]);
+    EXPECT_EQ(avg.function, AggregateFunction::Avg);
+    EXPECT_EQ(avg.column, "age");
+    EXPECT_FALSE(avg.count_star);
+}
+
 TEST(QueryParser, RejectsSyntaxErrorsInvalidCharactersAndMixedCaseKeywords) {
     EXPECT_THROW(parse_sql("CREATE DATABASE app"), std::exception);
     EXPECT_THROW(parse_sql("CREATE DATABASE @bad;"), std::exception);
