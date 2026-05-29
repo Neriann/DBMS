@@ -1,9 +1,7 @@
 #include "crow.h"
 
 #include <arpa/inet.h>
-
 #include <cerrno>
-
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -14,11 +12,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
-
 #include <thread>
 #include <atomic>
 #include <chrono>
-
 #include <mutex>
 
 
