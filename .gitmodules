@@ -1,6 +1,0 @@
-[submodule "libs/json"]
-	path = libs/json
-	url = https://github.com/nlohmann/json.git
-[submodule "libs/crow"]
-	path = libs/crow
-	url = https://github.com/CrowCpp/Crow.git

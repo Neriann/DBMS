@@ -11,10 +11,29 @@ find_package(Boost REQUIRED COMPONENTS container date_time)
 set(DBMS_TREE_BSP 4)
 set(INDEX_TREE_LIB dbms_b_star_plus_tree)
 
-add_subdirectory(libs/json)
+include(FetchContent)
+
+set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json
+        GIT_TAG v3.12.0
+        GIT_SHALLOW TRUE
+)
 
 set(CROW_USE_BOOST ON)
-add_subdirectory(libs/crow)
+set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(CROW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CROW_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+        Crow
+        GIT_REPOSITORY https://github.com/CrowCpp/Crow
+        GIT_TAG v1.3.2
+        GIT_SHALLOW TRUE
+)
+
+FetchContent_MakeAvailable(nlohmann_json Crow)
 
 add_library(dbms_b_star_plus_tree INTERFACE)
 target_include_directories(dbms_b_star_plus_tree
