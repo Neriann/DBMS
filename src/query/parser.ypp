@@ -65,6 +65,9 @@
 %token KW_DELETE
 %token KW_FROM
 %token KW_SELECT
+%token KW_SUM
+%token KW_COUNT
+%token KW_AVG
 %token KW_WHERE
 %token KW_AS
 %token KW_NOT
@@ -123,9 +126,10 @@
 %type <std::pair<std::string, Expr>> assignment
 %type <std::vector<std::pair<std::string, Expr>>> assignment_list
 
-%type <SelectColumn> select_col
-%type <std::vector<SelectColumn>> select_cols
-%type <std::vector<SelectColumn>> select_list
+%type <SelectItem> select_item
+%type <std::vector<SelectItem>> select_items
+%type <std::vector<SelectItem>> select_list
+%type <std::string> opt_alias
 
 %type <std::optional<Condition>> opt_where
 
@@ -199,6 +203,21 @@ ident:
     | KW_VALUE
         {
             $$ = "value";
+        }
+
+    | KW_SUM
+        {
+            $$ = "sum";
+        }
+
+    | KW_COUNT
+        {
+            $$ = "count";
+        }
+
+    | KW_AVG
+        {
+            $$ = "avg";
         }
     ;
 
@@ -346,38 +365,65 @@ assignment:
         }
     ;
 
-select_cols:
-      select_col
+select_items:
+      select_item
         {
-            $$ = std::vector<SelectColumn>{std::move($1)};
+            $$ = std::vector<SelectItem>{std::move($1)};
         }
 
-    | select_cols COMMA select_col
+    | select_items COMMA select_item
         {
             $1.push_back(std::move($3));
             $$ = std::move($1);
         }
     ;
 
-select_col:
-      ident
+select_item:
+      ident opt_alias
         {
-            $$ = SelectColumn{std::move($1), ""};
+            $$ = SelectColumn{std::move($1), std::move($2)};
         }
 
-    | ident KW_AS ident
+    | KW_COUNT LPAREN STAR RPAREN opt_alias
         {
-            $$ = SelectColumn{std::move($1), std::move($3)};
+            $$ = AggregateCall{AggregateFunction::Count, "", true, std::move($5)};
+        }
+
+    | KW_COUNT LPAREN ident RPAREN opt_alias
+        {
+            $$ = AggregateCall{AggregateFunction::Count, std::move($3), false, std::move($5)};
+        }
+
+    | KW_SUM LPAREN ident RPAREN opt_alias
+        {
+            $$ = AggregateCall{AggregateFunction::Sum, std::move($3), false, std::move($5)};
+        }
+
+    | KW_AVG LPAREN ident RPAREN opt_alias
+        {
+            $$ = AggregateCall{AggregateFunction::Avg, std::move($3), false, std::move($5)};
+        }
+    ;
+
+opt_alias:
+      %empty
+        {
+            $$ = "";
+        }
+
+    | KW_AS ident
+        {
+            $$ = std::move($2);
         }
     ;
 
 select_list:
-      select_cols
+      select_items
         {
             $$ = std::move($1);
         }
 
-    | LPAREN select_cols RPAREN
+    | LPAREN select_items RPAREN
         {
             $$ = std::move($2);
         }

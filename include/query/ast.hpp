@@ -108,10 +108,25 @@ struct DropTableStmt {
     std::string table_name;
 };
 
+enum class AggregateFunction {
+    Sum,
+    Count,
+    Avg
+};
+
 struct SelectColumn {
     std::string name;
     std::string alias;
 };
+
+struct AggregateCall {
+    AggregateFunction function;
+    std::string column;
+    bool count_star = false;
+    std::string alias;
+};
+
+using SelectItem = std::variant<SelectColumn, AggregateCall>;
 
 struct InsertStmt {
     std::string db_name;
@@ -137,7 +152,7 @@ struct SelectStmt {
     std::string db_name;
     std::string table_name;
     bool star = false;
-    std::vector<SelectColumn> columns;
+    std::vector<SelectItem> items;
     std::optional<Condition> where;
 };
 
