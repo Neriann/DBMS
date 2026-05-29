@@ -65,7 +65,7 @@ void Table::validate_row(const Row &row) const {
             }
         } else if (col.type == ColumnType::INT && !std::holds_alternative<int>(val)) {
             throw std::invalid_argument("Column '" + col.name + "' expects INT");
-        } else if (col.type == ColumnType::STRING && !std::holds_alternative<std::string>(val)) {
+        } else if (col.type == ColumnType::STRING && !std::holds_alternative<InternedString>(val)) {
             throw std::invalid_argument("Column '" + col.name + "' expects STRING");
         }
     }

@@ -65,16 +65,20 @@ int compare_values(const Value &lhs, const Value &rhs) {
         return (l > r) - (l < r);
     }
 
-    const std::string &l = std::get<std::string>(lhs);
-    const std::string &r = std::get<std::string>(rhs);
+    const std::string &l = global_string_pool().get(std::get<InternedString>(lhs).id);
+    const std::string &r = global_string_pool().get(std::get<InternedString>(rhs).id);
     return (l > r) - (l < r);
+}
+
+const std::string &interned_value_to_string(const Value &value) {
+    return global_string_pool().get(std::get<InternedString>(value).id);
 }
 
 nlohmann::json value_to_json(const Value &value) {
     return std::visit(
         Overloaded{
             [](const int v) -> nlohmann::json { return v; },
-            [](const std::string &v) -> nlohmann::json { return v; },
+            [](const InternedString &v) -> nlohmann::json { return global_string_pool().get(v.id); },
             [](std::nullptr_t) -> nlohmann::json { return nullptr; }
         },
         value);
@@ -91,7 +95,7 @@ void validate_default_value(const Column &column, const Value &value) {
     if (column.type == ColumnType::INT && !std::holds_alternative<int>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be INT");
     }
-    if (column.type == ColumnType::STRING && !std::holds_alternative<std::string>(value)) {
+    if (column.type == ColumnType::STRING && !std::holds_alternative<InternedString>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
@@ -407,16 +411,16 @@ bool Executor::eval_condition(
 
             const Value lhs = eval_expr(cond.like->lhs, row, column_indexes);
             const Value rhs = eval_expr(cond.like->rhs, row, column_indexes);
-            if (!std::holds_alternative<std::string>(lhs)) {
+            if (!std::holds_alternative<InternedString>(lhs)) {
                 throw std::runtime_error("LIKE expects a string left operand");
             }
-            if (!std::holds_alternative<std::string>(rhs)) {
+            if (!std::holds_alternative<InternedString>(rhs)) {
                 throw std::runtime_error("LIKE expects a string right operand");
             }
 
             try {
-                const std::regex pattern(std::get<std::string>(rhs));
-                return std::regex_match(std::get<std::string>(lhs), pattern);
+                const std::regex pattern(interned_value_to_string(rhs));
+                return std::regex_match(interned_value_to_string(lhs), pattern);
             } catch (const std::regex_error &) {
                 throw std::runtime_error("Invalid LIKE regex pattern");
             }

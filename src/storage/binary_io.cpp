@@ -32,8 +32,9 @@ void write_value(std::ostream& out, const Value& value) {
         return;
     }
 
-    if (std::holds_alternative<std::string>(value)) {
-        const auto& val = std::get<std::string>(value);
+    if (std::holds_alternative<InternedString>(value)) {
+        const auto& interned = std::get<InternedString>(value);
+        const auto& val = global_string_pool().get(interned.id);
         const auto len = val.size();
         write_safe(out, reinterpret_cast<const char*>(&len), sizeof(len));
         write_safe(out, val.data(), static_cast<std::streamsize>(len));
@@ -63,7 +64,7 @@ Value read_value(std::istream& in) {
 
         std::string val(len, '\0');
         read_safe(in, val.data(), static_cast<std::streamsize>(len));
-        return val;
+        return InternedString{global_string_pool().intern(val)};
     }
 
     if (type_idx == 2) {
