@@ -63,6 +63,10 @@ add_executable(auth_integration_tests integration/auth/auth_integration_tests.cp
 target_include_directories(auth_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(auth_integration_tests PRIVATE dbms_core gtest_main)
 
+add_executable(rbac_integration_tests rbac/permission_resolver_unit_tests.cpp)
+target_include_directories(rbac_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(rbac_integration_tests PRIVATE dbms_core gtest_main)
+
 add_executable(auth_middleware_integration_tests
         integration/server/auth_middleware_integration_tests.cpp
         ../src/server/middleware/auth_middleware.cpp)
@@ -83,4 +87,5 @@ gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)
 gtest_discover_tests(auth_integration_tests)
+gtest_discover_tests(rbac_integration_tests)
 gtest_discover_tests(auth_middleware_integration_tests)
