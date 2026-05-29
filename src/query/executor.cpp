@@ -8,6 +8,7 @@
 #include <ctime>
 #include <limits>
 #include <optional>
+#include <ranges>
 #include <regex>
 #include <set>
 #include <stdexcept>
