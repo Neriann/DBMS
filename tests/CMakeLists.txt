@@ -6,35 +6,60 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG v1.17.0
 )
+
+# -------------------------
+# UNIT TESTS (у тебя уже есть)
+# -------------------------
+
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(storage_unit_test storage/unit.cpp)
+add_executable(storage_unit_test unit/storage/unit.cpp)
 target_link_libraries(storage_unit_test PRIVATE dbms_core gtest_main)
 
-add_executable(binary_io_test storage/binary_io.cpp)
+add_executable(binary_io_test unit/storage/binary_io.cpp)
 target_link_libraries(binary_io_test PRIVATE dbms_core gtest_main)
 
-add_executable(serializer_test storage/serializer.cpp)
+add_executable(serializer_test unit/storage/serializer.cpp)
 target_link_libraries(serializer_test PRIVATE dbms_core gtest_main)
 
-add_executable(pager_test storage/pager.cpp)
+add_executable(pager_test unit/storage/pager.cpp)
 target_link_libraries(pager_test PRIVATE dbms_core gtest_main)
 
-add_executable(page_io_test storage/page_io.cpp)
+add_executable(page_io_test unit/storage/page_io.cpp)
 target_link_libraries(page_io_test PRIVATE dbms_core gtest_main)
 
-add_executable(b_star_plus_tree_test core/b_star_plus_tree.cpp)
+add_executable(b_star_plus_tree_test    unit/core/b_star_plus_tree.cpp)
 target_link_libraries(b_star_plus_tree_test PRIVATE dbms_core gtest_main)
 
-add_executable(access_logger_test server/unit.cpp ../src/server/access_logger.cpp ../src/server/telemetry.cpp)
+add_executable(access_logger_test unit/server/access_logger.cpp unit/server/telemetry.cpp)
 target_include_directories(access_logger_test PRIVATE ../include)
 target_link_libraries(access_logger_test PRIVATE Crow::Crow nlohmann_json::nlohmann_json gtest_main)
 
-add_executable(query_tests query/tests.cpp)
+add_executable(query_tests unit/query/tests.cpp)
 target_link_libraries(query_tests PRIVATE dbms_core gtest gtest_main)
 target_include_directories(query_tests PRIVATE ${gtest_SOURCE_DIR}/include)
+
+
+add_executable(task_manager_test
+    unit/async/task_manager_test.cpp
+)
+target_link_libraries(task_manager_test PRIVATE dbms_core gtest_main)
+
+# -------------------------
+# ASYNC TESTS
+# -------------------------
+
+
+add_executable(api_async_test
+    integration/api_async_test.cpp
+)
+target_link_libraries(api_async_test PRIVATE dbms_core)
+
+# -------------------------
+# TEST DISCOVERY
+# -------------------------
 
 include(GoogleTest)
 gtest_discover_tests(storage_unit_test)
