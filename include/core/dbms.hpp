@@ -1,16 +1,17 @@
 #pragma once
 #include "database.hpp"
-#include "allocator.hpp"
+#include "trees/b_star_plus_tree.hpp"
+#include <filesystem>
 #include <memory>
 #include <string>
-
-using DbTree = IndexTree<std::string, std::unique_ptr<Database> >;
-using DbAllocator = Allocator;
+#include <vector>
 
 class DBMS {
     friend class StorageManager;
 public:
     DBMS();
+
+    explicit DBMS(std::filesystem::path index_path);
 
     /**
      *
@@ -67,8 +68,12 @@ public:
     [[nodiscard]] const Database *current_database() const noexcept;
 
 private:
-    DbAllocator databases_alloc_;
-    DbTree databases_;
+    static std::filesystem::path default_index_path();
+
+    std::filesystem::path index_path_;
+    std::filesystem::path database_indexes_dir_;
+    BSP_tree<std::string, std::size_t> databases_;
+    std::vector<std::unique_ptr<Database> > database_storage_;
 
     Database *current_db_ = nullptr;
 };

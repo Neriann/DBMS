@@ -20,8 +20,6 @@ DBMS  ->  Database  ─>  Table (Schema / Row / Index)
 | `include/core/schema.hpp`     | `src/core/schema.cpp`   |
 | `include/core/row.hpp`        | *(header-only)*         |
 | `include/core/value.hpp`      | `src/core/value.cpp`    |
-| `include/core/index_tree.hpp` | *(header-only)*         |
-| `include/core/allocator.hpp`  | *(header-only)*         |
 
 ---
 
@@ -57,32 +55,9 @@ A schema is a list of column descriptors. Column position is the stable identifi
 
 ---
 
-### `IndexTree<tkey, tvalue, cmp>`
+### `BSP_tree<tkey, tvalue, cmp>`
 
-A compile-time alias resolved by `DBMS_INDEX_TREE`:
-
-| Macro value                 | Tree             |
-|-----------------------------|------------------|
-| `DBMS_TREE_B`               | `B_tree`         |
-| `DBMS_TREE_BP`              | `BP_tree` (B+)   |
-| `DBMS_TREE_BS`              | `BS_tree` (B*)   |
-| `DBMS_TREE_BSP` *(default)* | `BSP_tree` (B*+) |
-
----
-
-### `Allocator`
-
-A compile-time alias resolved by `DBMS_ALLOCATOR`:
-
-| Macro value                      | Allocator                  |
-|----------------------------------|----------------------------|
-| `DBMS_ALLOC_GLOBAL_HEAP`         | `allocator_global_heap`    |
-| `DBMS_ALLOC_BOUNDARY_TAGS`       | `allocator_boundary_tags`  |
-| `DBMS_ALLOC_BUDDIES`             | `allocator_buddies_system` |
-| `DBMS_ALLOC_SORTED_LIST`         | `allocator_sorted_list`    |
-| `DBMS_ALLOC_RB_TREE` *(default)* | `allocator_red_black_tree` |
-
-Note: non-heap allocators are initialized with 1 MiB.
+A local disk-backed B*+ tree used for database, table, and column indexes.
 
 ---
 
@@ -90,7 +65,7 @@ Note: non-heap allocators are initialized with 1 MiB.
 
 ### `DBMS`
 
-Holds all databases in an `IndexTree<string, unique_ptr<Database>>` and tracks the
+Holds all databases in a `BSP_tree<string, size_t>` and tracks the
 current database for use.
 
 | Method                  | Throws                            | Notes                                                                       |
@@ -106,7 +81,7 @@ current database for use.
 
 ### `Database`
 
-Owns a named collection of tables in an `IndexTree<string, unique_ptr<Table>>`.
+Owns a named collection of tables in a `BSP_tree<string, size_t>`.
 
 | Method                       | Throws                            | Notes                                   |
 |------------------------------|-----------------------------------|-----------------------------------------|
