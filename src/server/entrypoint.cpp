@@ -177,35 +177,6 @@ std::string recv_all(const int fd) {
     return response;
 }
 
-std::string forward_query(const StorageNode& node,
-                          const std::string& sql) {
-    const auto socket = connect_to_server(
-        node.host,
-        node.port
-    );
-
-    std::ostringstream request;
-
-    request
-        << "POST /query HTTP/1.1\r\n"
-        << "Host: "
-        << node.host
-        << ':'
-        << node.port
-        << "\r\n"
-        << "Content-Type: text/plain\r\n"
-        << "Content-Length: "
-        << sql.size()
-        << "\r\n"
-        << "Connection: close\r\n"
-        << "\r\n"
-        << sql;
-
-    send_all(socket.fd(), request.str());
-
-    return recv_all(socket.fd());
-}
-
 std::string extract_body(const std::string& response) {
     const auto pos = response.find("\r\n\r\n");
 
@@ -234,6 +205,17 @@ bool ping_node(const StorageNode& node) {
     }
 }
 
+void restart_node(const StorageNode& node) {
+    std::string cmd =
+        "./dbms_server " + node.port + " ./data" + node.port +
+        " > logs_" + node.port + ".txt 2>&1 &";
+
+    std::cout << "[HEARTBEAT] restarting node: "
+              << node.host << ":" << node.port << "\n";
+
+    std::system(cmd.c_str());
+}
+
 void heartbeat_loop(std::vector<StorageNode>* nodes,
                     std::atomic<bool>* running)
 {
@@ -244,20 +226,51 @@ void heartbeat_loop(std::vector<StorageNode>* nodes,
             const bool was_alive = node.alive;
             const bool is_alive = ping_node(node);
 
-            node.alive = is_alive;
-
-            if (node.alive && !was_alive) {
-                std::cout << "[HEARTBEAT] node recovered\n";
-            }
-
-            if (!node.alive && was_alive) {
+            if (!is_alive && was_alive) {
                 std::cout << "[HEARTBEAT] node died\n";
+                restart_node(node);
+            }
+            if (is_alive && !was_alive) {
+                std::cout << "[HEARTBEAT] node recovered\n";
             }
             
         }
 
         std::this_thread::sleep_for(2s);
     }
+}
+
+std::string send_with_failover(std::vector<StorageNode>& nodes,
+                               const std::string& request)
+{
+    std::vector<StorageNode*> candidates;
+
+    for (auto& node : nodes) {
+        if (node.alive) {
+            candidates.push_back(&node);
+        }
+    }
+
+    if (candidates.empty()) {
+        throw std::runtime_error("no alive storage nodes available");
+    }
+
+    for (auto* node : candidates) {
+        try {
+            auto socket = connect_to_server(node->host, node->port);
+
+            send_all(socket.fd(), request);
+            return recv_all(socket.fd());
+        }
+        catch (...) {
+            node->alive = false;
+
+            std::cout << "[FAILOVER] node failed: "
+                      << node->host << ":" << node->port << "\n";
+        }
+    }
+
+    throw std::runtime_error("all storage nodes failed");
 }
 
 } // namespace
@@ -271,48 +284,24 @@ int main() {
             "9001"
         }
     };
-
-    std::size_t next_node = 0;
-
+    
     CROW_ROUTE(app, "/query")
-        .methods(crow::HTTPMethod::Post)
-    ([&nodes, &next_node](const crow::request& req) {
+    .methods(crow::HTTPMethod::Post)
+    ([&nodes](const crow::request& req) {
 
         if (nodes.empty()) {
-            return crow::response(
-                500,
-                "no storage nodes available"
-            );
+            return crow::response(500, "no storage nodes available");
         }
-
-        StorageNode* selected = nullptr;
-
-        for (auto& node : nodes) {
-            if (node.alive) {
-                selected = &node;
-                break;
-            }
-        }
-
-        if (!selected) {
-            return crow::response(503, "no alive storage nodes");
-        }
-        ++next_node;
 
         try {
-            const auto response =
-                forward_query(*selected, req.body);
-
+            auto response = send_with_failover(nodes, req.body);
             return crow::response(
                 200,
                 extract_body(response)
             );
         }
         catch (const std::exception& e) {
-            return crow::response(
-                500,
-                e.what()
-            );
+            return crow::response(503, e.what());
         }
     });
 
