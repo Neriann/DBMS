@@ -1,8 +1,25 @@
 #include "async/task_manager.hpp"
 
+#include <array>
+#include <iomanip>
 #include <random>
 #include <sstream>
 #include <stdexcept>
+
+std::string task_status_to_string(const TaskStatus status) {
+    switch (status) {
+        case TaskStatus::Pending:
+            return "pending";
+        case TaskStatus::Running:
+            return "running";
+        case TaskStatus::Done:
+            return "done";
+        case TaskStatus::Error:
+            return "error";
+    }
+
+    throw std::runtime_error("unknown task status");
+}
 
 TaskManager::TaskManager(
     ExecutorFunction executor
@@ -101,7 +118,7 @@ void TaskManager::worker_loop() {
                 auto it = tasks_.find(task.id);
                 if (it != tasks_.end()) {
                     it->second.status = TaskStatus::Error;
-                    it->second.result = e.what();
+                    it->second.error = e.what();
                 }
             }
         }
@@ -109,29 +126,29 @@ void TaskManager::worker_loop() {
 }
 
 std::string TaskManager::generate_task_id() {
-    static constexpr char chars[] =
-        "0123456789abcdef";
+    std::array<unsigned char, 16> bytes{};
 
-    // thread_local генератор — создаётся один раз на поток
     static thread_local std::mt19937 gen(
         std::random_device{}()
     );
+    std::uniform_int_distribution<int> dist(0, 255);
 
-    std::uniform_int_distribution<>
-        dist(0, 15);
+    for (auto& byte : bytes) {
+        byte = static_cast<unsigned char>(dist(gen));
+    }
 
-    std::stringstream out;
+    bytes[6] = static_cast<unsigned char>((bytes[6] & 0x0f) | 0x40);
+    bytes[8] = static_cast<unsigned char>((bytes[8] & 0x3f) | 0x80);
 
-    int groups[] = {8, 4, 4, 4, 12};
+    std::ostringstream out;
+    out << std::hex << std::setfill('0') << std::nouppercase;
 
-    for (int g = 0; g < 5; ++g) {
-        if (g != 0) {
+    for (std::size_t i = 0; i < bytes.size(); ++i) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
             out << '-';
         }
 
-        for (int i = 0; i < groups[g]; ++i) {
-            out << chars[dist(gen)];
-        }
+        out << std::setw(2) << static_cast<int>(bytes[i]);
     }
 
     return out.str();

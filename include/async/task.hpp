@@ -20,3 +20,5 @@ struct Task {
 
     std::string error;
 };
+
+std::string task_status_to_string(TaskStatus status);

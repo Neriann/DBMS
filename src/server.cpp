@@ -1,3 +1,4 @@
+#include "async/task_manager.hpp"
 #include "crow.h"
 #include "core/dbms.hpp"
 #include "query/executor.hpp"
@@ -11,7 +12,18 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <string>
+
+namespace {
+
+crow::response json_response(const int status_code, const nlohmann::json& body) {
+    crow::response response(status_code, body.dump());
+    response.set_header("Content-Type", "application/json");
+    return response;
+}
+
+} // namespace
 
 int main(const int argc, char **argv) {
     std::uint16_t port = 8080;
@@ -50,23 +62,56 @@ int main(const int argc, char **argv) {
     }
     auto telemetry = std::make_shared<TelemetryCollector>();
     crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger, telemetry});
+    TaskManager tasks([&exec, &storage, &dbms, &mtx](const std::string& sql) {
+        std::lock_guard lock(mtx);
+
+        try {
+            auto output = run_sql(sql, exec);
+            storage.save(dbms);
+            return output.empty() ? "OK" : output;
+        } catch (...) {
+            storage.save(dbms);
+            throw;
+        }
+    });
 
     CROW_ROUTE(app, "/query").methods(crow::HTTPMethod::Post)(
-        [&exec, &storage, &dbms, &mtx](const crow::request &req) {
-            try {
-                std::lock_guard lock(mtx);
-                std::string output;
-                try {
-                    output = run_sql(req.body, exec);
-                } catch (...) {
-                    storage.save(dbms);
-                    throw;
-                }
-                storage.save(dbms);
-                return crow::response(200, output.empty() ? "OK" : output);
-            } catch (const std::exception &e) {
-                return crow::response(400, e.what());
+        [&tasks](const crow::request &req) {
+            const auto id = tasks.submit(req.body);
+
+            return json_response(
+                202,
+                {
+                    {"task_id", id},
+                    {"status", "pending"}
+                });
+        });
+
+    CROW_ROUTE(app, "/task/<string>").methods(crow::HTTPMethod::Get)(
+        [&tasks](const std::string& id) {
+            const auto task = tasks.get_task(id);
+
+            if (!task.has_value()) {
+                return json_response(
+                    404,
+                    {
+                        {"error", "task not found"},
+                        {"task_id", id}
+                    });
             }
+
+            nlohmann::json body{
+                {"task_id", task->id},
+                {"status", task_status_to_string(task->status)}
+            };
+
+            if (task->status == TaskStatus::Done) {
+                body["result"] = task->result;
+            } else if (task->status == TaskStatus::Error) {
+                body["error"] = task->error;
+            }
+
+            return json_response(200, body);
         });
 
     CROW_ROUTE(app, "/metrics").methods(crow::HTTPMethod::Get)(

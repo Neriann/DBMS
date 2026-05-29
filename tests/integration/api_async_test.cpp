@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include <fstream>
+#include <nlohmann/json.hpp>
 #include <string>
 
 static std::string read_file(const std::string& path) {
@@ -25,7 +26,8 @@ int main() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-    std::string id = read_file("id.txt");
+    const auto submit_response = nlohmann::json::parse(read_file("id.txt"));
+    std::string id = submit_response.at("task_id").get<std::string>();
 
     std::cout << "Task ID: " << id << "\n";
 
