@@ -81,6 +81,16 @@ std::vector<RowID> Table::range_indexed(
     }
 
     const auto &tree = index_it->second->tree;
+    if (lower && upper) {
+        ValueComparator comp;
+        const bool upper_less_than_lower = comp(*upper, *lower);
+        const bool lower_less_than_upper = comp(*lower, *upper);
+        const bool equal = !upper_less_than_lower && !lower_less_than_upper;
+        if (upper_less_than_lower || (equal && (!lower_inclusive || !upper_inclusive))) {
+            return {};
+        }
+    }
+
     auto begin = lower
         ? (lower_inclusive ? tree.lower_bound(*lower) : tree.upper_bound(*lower))
         : tree.begin();
