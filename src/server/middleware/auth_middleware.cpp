@@ -1,19 +1,32 @@
 #include "server/middleware/auth_middleware.hpp"
 
-#include "common/not_implemented.hpp"
-
 namespace server {
 
-AuthMiddleware::AuthMiddleware(auth::AuthService &auth_service)
-    : auth_service_(auth_service) {
-}
+    AuthMiddleware::AuthMiddleware(auth::AuthService &auth_service)
+        : auth_service_(auth_service) {
+    }
 
-void AuthMiddleware::before_handle(crow::request &req, crow::response &res, context &ctx) const {
-    common::not_implemented();
-}
+    void AuthMiddleware::before_handle(crow::request &req, crow::response &res, context &ctx) const {
+        auto auth_header = req.get_header_value("Authorization");
+        if (auth_header.empty() || auth_header.find("Bearer ") != 0) {
+            res.code = crow::status::UNAUTHORIZED;
+            res.body = "Missing or invalid Authorization header";
+            res.end();
+            return;
+        }
 
-void AuthMiddleware::after_handle(crow::request &, crow::response &, context &) const {
-    common::not_implemented();
-}
+        auto token = auth_header.substr(7); // Skip "Bearer "
+        try {
+            ctx.session = auth_service_.authenticate(token);
+        } catch (const std::exception &e) {
+            res.code = crow::status::UNAUTHORIZED;
+            res.body = e.what();
+            res.end();
+        }
+    }
+
+    void AuthMiddleware::after_handle(crow::request &, crow::response &, context &) const {
+        // No-op for now.
+    }
 
 } // namespace server
