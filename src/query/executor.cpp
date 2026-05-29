@@ -173,6 +173,173 @@ void validate_default_value(const Column &column, const Value &value) {
 
 // endregion
 
+// region Semantic Validation Helpers
+
+enum class ExprType {
+    Int,
+    String,
+    Null
+};
+
+bool is_orderable_type(const ExprType type) {
+    return type == ExprType::Int || type == ExprType::String;
+}
+
+ExprType infer_expr_type(
+    const Expr &expr,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes) {
+    switch (expr.kind) {
+        case ExprKind::Literal:
+            if (std::holds_alternative<int>(expr.literal)) {
+                return ExprType::Int;
+            }
+            if (std::holds_alternative<InternedString>(expr.literal)) {
+                return ExprType::String;
+            }
+            return ExprType::Null;
+
+        case ExprKind::Column: {
+            const int index = require_column(column_indexes, expr.column);
+            return schema[static_cast<std::size_t>(index)].type == ColumnType::INT
+                ? ExprType::Int
+                : ExprType::String;
+        }
+
+        case ExprKind::UnaryMinus: {
+            if (!expr.operand) {
+                throw std::runtime_error("Malformed unary minus expression");
+            }
+            const ExprType operand_type = infer_expr_type(*expr.operand, schema, column_indexes);
+            if (operand_type != ExprType::Int) {
+                throw std::runtime_error("Unary minus expects an INT expression");
+            }
+            return ExprType::Int;
+        }
+    }
+
+    throw std::runtime_error("Unknown expression kind");
+}
+
+void validate_ordered_operands(const ExprType lhs, const ExprType rhs, const std::string &operation) {
+    if (!is_orderable_type(lhs) || !is_orderable_type(rhs)) {
+        throw std::runtime_error(operation + " cannot order NULL values");
+    }
+    if (lhs != rhs) {
+        throw std::runtime_error(operation + " requires operands of the same type");
+    }
+}
+
+void validate_literal_regex(const Expr &expr) {
+    if (expr.kind != ExprKind::Literal || !std::holds_alternative<InternedString>(expr.literal)) {
+        return;
+    }
+
+    const InternedString pattern = std::get<InternedString>(expr.literal);
+    try {
+        const std::regex compiled(global_string_pool().get(pattern.id));
+    } catch (const std::regex_error &) {
+        throw std::runtime_error("Invalid LIKE regex pattern");
+    }
+}
+
+void validate_condition_semantics(
+    const Condition &condition,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes) {
+    switch (condition.kind) {
+        case ConditionKind::Simple: {
+            if (!condition.predicate) {
+                throw std::runtime_error("Malformed simple condition");
+            }
+
+            const ExprType lhs = infer_expr_type(condition.predicate->lhs, schema, column_indexes);
+            const ExprType rhs = infer_expr_type(condition.predicate->rhs, schema, column_indexes);
+            if (condition.predicate->op != CmpOp::EQ && condition.predicate->op != CmpOp::NEQ) {
+                validate_ordered_operands(lhs, rhs, "Comparison");
+            }
+            return;
+        }
+
+        case ConditionKind::Between: {
+            if (!condition.between) {
+                throw std::runtime_error("Malformed BETWEEN condition");
+            }
+
+            const ExprType lhs = infer_expr_type(condition.between->lhs, schema, column_indexes);
+            const ExprType lo = infer_expr_type(condition.between->lo, schema, column_indexes);
+            const ExprType hi = infer_expr_type(condition.between->hi, schema, column_indexes);
+            validate_ordered_operands(lhs, lo, "BETWEEN");
+            validate_ordered_operands(lhs, hi, "BETWEEN");
+            return;
+        }
+
+        case ConditionKind::Like: {
+            if (!condition.like) {
+                throw std::runtime_error("Malformed LIKE condition");
+            }
+
+            const ExprType lhs = infer_expr_type(condition.like->lhs, schema, column_indexes);
+            const ExprType rhs = infer_expr_type(condition.like->rhs, schema, column_indexes);
+            if (lhs != ExprType::String || rhs != ExprType::String) {
+                throw std::runtime_error("LIKE expects STRING operands");
+            }
+            validate_literal_regex(condition.like->rhs);
+            return;
+        }
+
+        case ConditionKind::And:
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed AND condition");
+            }
+            validate_condition_semantics(*condition.left, schema, column_indexes);
+            validate_condition_semantics(*condition.right, schema, column_indexes);
+            return;
+
+        case ConditionKind::Or:
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed OR condition");
+            }
+            validate_condition_semantics(*condition.left, schema, column_indexes);
+            validate_condition_semantics(*condition.right, schema, column_indexes);
+            return;
+    }
+
+    throw std::runtime_error("Unknown condition kind");
+}
+
+void validate_optional_condition(
+    const std::optional<Condition> &condition,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes) {
+    if (condition) {
+        validate_condition_semantics(*condition, schema, column_indexes);
+    }
+}
+
+void validate_assignment_semantics(
+    const Column &column,
+    const Expr &expr,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes) {
+    const ExprType expr_type = infer_expr_type(expr, schema, column_indexes);
+    if (expr_type == ExprType::Null) {
+        if (column.is_not_null() || column.is_indexed()) {
+            throw std::runtime_error("Column '" + column.name + "' cannot be assigned NULL");
+        }
+        return;
+    }
+
+    const bool matches_column_type =
+        (column.type == ColumnType::INT && expr_type == ExprType::Int)
+        || (column.type == ColumnType::STRING && expr_type == ExprType::String);
+    if (!matches_column_type) {
+        throw std::runtime_error("Assignment to column '" + column.name + "' has incompatible type");
+    }
+}
+
+// endregion
+
 // region Value Helpers
 
 const std::string &interned_value_to_string(const Value &value) {
@@ -668,8 +835,11 @@ std::string Executor::exec_update(const UpdateStmt &s) {
     for (const auto &[column, expr] : s.assignments) {
         ensure_no_duplicate(seen, column);
         seen.insert(column);
-        assignments.push_back({require_column(column_indexes, column), expr});
+        const int column_index = require_column(column_indexes, column);
+        validate_assignment_semantics(schema[static_cast<std::size_t>(column_index)], expr, schema, column_indexes);
+        assignments.push_back({column_index, expr});
     }
+    validate_optional_condition(s.where, schema, column_indexes);
 
     std::vector<std::pair<RowID, Row>> updates;
     const std::vector<Row> &data = table.data();
@@ -695,6 +865,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
+    validate_optional_condition(s.where, schema, column_indexes);
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
@@ -717,6 +888,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
+    validate_optional_condition(s.where, schema, column_indexes);
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
