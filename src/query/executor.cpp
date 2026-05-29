@@ -175,7 +175,9 @@ void validate_default_value(const Column &column, const Value &value) {
 
 // region Value Helpers
 
-const std::string &interned_value_to_string(const Value &value);
+const std::string &interned_value_to_string(const Value &value) {
+    return global_string_pool().get(std::get<InternedString>(value).id);
+}
 
 int compare_values(const Value &lhs, const Value &rhs) {
     if (lhs.index() != rhs.index()) {
@@ -193,10 +195,6 @@ int compare_values(const Value &lhs, const Value &rhs) {
     const std::string &l = interned_value_to_string(lhs);
     const std::string &r = interned_value_to_string(rhs);
     return (l > r) - (l < r);
-}
-
-const std::string &interned_value_to_string(const Value &value) {
-    return global_string_pool().get(std::get<InternedString>(value).id);
 }
 
 nlohmann::json value_to_json(const Value &value) {
@@ -439,6 +437,7 @@ std::vector<RowID> intersect_row_ids(std::vector<RowID> lhs, std::vector<RowID> 
     std::ranges::sort(rhs);
 
     std::vector<RowID> result;
+    result.reserve(std::min(lhs.size(), rhs.size()));
     std::ranges::set_intersection(lhs, rhs, std::back_inserter(result));
     return result;
 }
@@ -448,6 +447,7 @@ std::vector<RowID> union_row_ids(std::vector<RowID> lhs, std::vector<RowID> rhs)
     std::ranges::sort(rhs);
 
     std::vector<RowID> result;
+    result.reserve(lhs.size() + rhs.size());
     std::ranges::set_union(lhs, rhs, std::back_inserter(result));
     return result;
 }
