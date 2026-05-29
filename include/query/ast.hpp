@@ -156,10 +156,16 @@ struct SelectStmt {
     std::optional<Condition> where;
 };
 
+struct RevertStmt {
+    std::string db_name;
+    std::string table_name;
+    std::string timestamp;
+};
+
 //endregion statement nodes
 
 using Statement = std::variant<
     CreateDatabaseStmt, DropDatabaseStmt, UseStmt,
     CreateTableStmt, DropTableStmt,
-    InsertStmt, UpdateStmt, DeleteStmt, SelectStmt
+    InsertStmt, UpdateStmt, DeleteStmt, SelectStmt, RevertStmt
 >;

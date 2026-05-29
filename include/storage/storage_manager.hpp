@@ -58,11 +58,15 @@ private:
 
     [[nodiscard]] fs::path table_path(const std::string &db_name, const std::string &table_name) const;
 
+    [[nodiscard]] fs::path history_path(const std::string &db_name, const std::string &table_name) const;
+
     [[nodiscard]] fs::path schema_path(const std::string &db_name) const;
 
     // region helpers declaration
     void write_schema(const Database &db) const;
 
     void write_table_data(const std::string &db_name, const std::string &table_name, const Table &table) const;
+
+    void write_table_history(const std::string &db_name, const std::string &table_name, const Table &table) const;
     // endregion helpers declaration
 };

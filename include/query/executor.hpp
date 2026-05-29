@@ -73,6 +73,12 @@ private:
      */
     std::string exec_select(const SelectStmt &s);
 
+    /**
+     * @param s RevertStmt
+     * @return JSON confirmation string
+     */
+    std::string exec_revert(const RevertStmt &s);
+
     //region helpers
 
     /**

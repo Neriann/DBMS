@@ -8,6 +8,53 @@
 using json = nlohmann::json;
 
 namespace {
+    json value_to_json(const Value &value) {
+        if (std::holds_alternative<int>(value)) {
+            return std::get<int>(value);
+        }
+        if (std::holds_alternative<InternedString>(value)) {
+            const auto &interned = std::get<InternedString>(value);
+            return global_string_pool().get(interned.id);
+        }
+        return nullptr;
+    }
+
+    Value value_from_json(const json &j, const ColumnType type) {
+        if (j.is_null()) {
+            return nullptr;
+        }
+        if (type == ColumnType::INT) {
+            return j.get<int>();
+        }
+        if (type == ColumnType::STRING) {
+            const std::string &str = j.get<std::string>();
+            return InternedString{global_string_pool().intern(str)};
+        }
+
+        throw std::runtime_error("Corrupted row value: unknown column type");
+    }
+
+    json row_to_json(const Row &row) {
+        json result = json::array();
+        for (const Value &value: row) {
+            result.push_back(value_to_json(value));
+        }
+        return result;
+    }
+
+    Row row_from_json(const json &j, const Schema &schema) {
+        if (!j.is_array() || j.size() != schema.size()) {
+            throw std::runtime_error("Corrupted history: row width does not match schema");
+        }
+
+        Row row;
+        row.reserve(schema.size());
+        for (std::size_t i = 0; i < schema.size(); ++i) {
+            row.push_back(value_from_json(j.at(i), schema[i].type));
+        }
+        return row;
+    }
+
     json value_to_schema_json(const Value &value) {
         if (std::holds_alternative<int>(value)) {
             return std::get<int>(value);
@@ -88,6 +135,10 @@ fs::path StorageManager::table_path(const std::string &db_name, const std::strin
     return db_path(db_name) / (table_name + ".bin");
 }
 
+fs::path StorageManager::history_path(const std::string &db_name, const std::string &table_name) const {
+    return db_path(db_name) / (table_name + ".history.json");
+}
+
 void StorageManager::load(DBMS &dbms) const {
     if (!fs::exists(data_dir_)) {
         return;
@@ -129,6 +180,25 @@ void StorageManager::load(DBMS &dbms) const {
                 auto row = storage::read_row(tdf, schema.size());
                 table.restore_row(std::move(row), deleted);
             }
+
+            const auto h_path = history_path(db_name, table_name);
+            if (fs::exists(h_path)) {
+                std::ifstream hdf(h_path);
+                json h;
+                hdf >> h;
+
+                std::vector<Table::RowVersion> history;
+                history.reserve(h.size());
+                for (const auto &item: h) {
+                    Table::RowVersion version;
+                    item.at("row_id").get_to(version.row_id);
+                    item.at("timestamp_ms").get_to(version.timestamp_ms);
+                    item.at("deleted").get_to(version.deleted);
+                    version.row = row_from_json(item.at("row"), schema);
+                    history.push_back(std::move(version));
+                }
+                table.restore_history(std::move(history));
+            }
         }
     }
 }
@@ -156,6 +226,7 @@ void StorageManager::save(const DBMS &dbms) const {
             const auto &table = *db.table_storage_.at(table_it->second);
 
             write_table_data(db.name(), table_name, table);
+            write_table_history(db.name(), table_name, table);
         }
     }
 }
@@ -183,6 +254,7 @@ void StorageManager::save_table(const Database &db, const std::string &table_nam
     sdf_out << j.dump(4);
 
     write_table_data(db_name, table_name, table);
+    write_table_history(db_name, table_name, table);
 }
 
 void StorageManager::drop_database(const std::string &db_name) const {
@@ -191,6 +263,7 @@ void StorageManager::drop_database(const std::string &db_name) const {
 
 void StorageManager::drop_table(const std::string &db_name, const std::string &table_name) const {
     fs::remove(table_path(db_name, table_name));
+    fs::remove(history_path(db_name, table_name));
 
     const auto s_path = schema_path(db_name);
     if (fs::exists(s_path)) {
@@ -227,5 +300,21 @@ void StorageManager::write_table_data(const std::string &db_name, const std::str
 
         storage::write_row(tdf, data[id]);
     }
+}
+
+void StorageManager::write_table_history(const std::string &db_name, const std::string &table_name,
+                                         const Table &table) const {
+    json j = json::array();
+    for (const Table::RowVersion &version: table.history()) {
+        j.push_back(json{
+            {"row_id", version.row_id},
+            {"timestamp_ms", version.timestamp_ms},
+            {"deleted", version.deleted},
+            {"row", row_to_json(version.row)}
+        });
+    }
+
+    std::ofstream out(history_path(db_name, table_name));
+    out << j.dump(4);
 }
 // endregion helpers implementation

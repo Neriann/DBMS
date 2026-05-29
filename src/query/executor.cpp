@@ -1,6 +1,9 @@
 #include "query/executor.hpp"
 
 #include <nlohmann/json.hpp>
+#include <chrono>
+#include <cstdio>
+#include <ctime>
 #include <limits>
 #include <regex>
 #include <set>
@@ -25,6 +28,67 @@ nlohmann::json ok_json(const std::string &message) {
 
 nlohmann::json count_json(const std::string &operation, const std::size_t count) {
     return nlohmann::json{{"status", "ok"}, {"operation", operation}, {"count", count}};
+}
+
+Table::TimestampMillis parse_timestamp_ms(const std::string &text) {
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    int fraction = 0;
+    int consumed = 0;
+
+    if (std::sscanf(
+            text.c_str(),
+            "%4d.%2d.%2d-%2d:%2d:%2d.%6d%n",
+            &year,
+            &month,
+            &day,
+            &hour,
+            &minute,
+            &second,
+            &fraction,
+            &consumed) != 7
+        || consumed != static_cast<int>(text.size())) {
+        throw std::runtime_error("Invalid timestamp format, expected yyyy.mm.dd-hh:mm:ss.msmsms");
+    }
+
+    const std::size_t dot_pos = text.rfind('.');
+    const std::size_t fraction_digits = text.size() - dot_pos - 1;
+    int milliseconds = fraction;
+    if (fraction_digits > 3) {
+        for (std::size_t i = 0; i < fraction_digits - 3; ++i) {
+            milliseconds /= 10;
+        }
+    } else {
+        for (std::size_t i = fraction_digits; i < 3; ++i) {
+            milliseconds *= 10;
+        }
+    }
+
+    std::tm tm{};
+    tm.tm_year = year - 1900;
+    tm.tm_mon = month - 1;
+    tm.tm_mday = day;
+    tm.tm_hour = hour;
+    tm.tm_min = minute;
+    tm.tm_sec = second;
+    tm.tm_isdst = -1;
+
+    const std::time_t seconds_since_epoch = std::mktime(&tm);
+    if (seconds_since_epoch == static_cast<std::time_t>(-1)
+        || tm.tm_year != year - 1900
+        || tm.tm_mon != month - 1
+        || tm.tm_mday != day
+        || tm.tm_hour != hour
+        || tm.tm_min != minute
+        || tm.tm_sec != second) {
+        throw std::runtime_error("Invalid timestamp value");
+    }
+
+    return static_cast<Table::TimestampMillis>(seconds_since_epoch) * 1000 + milliseconds;
 }
 
 std::unordered_map<std::string, int> build_column_index_map(const Schema &schema) {
@@ -219,7 +283,8 @@ std::string Executor::execute(const Statement &stmt) {
             [this](const InsertStmt &s) { return exec_insert(s); },
             [this](const UpdateStmt &s) { return exec_update(s); },
             [this](const DeleteStmt &s) { return exec_delete(s); },
-            [this](const SelectStmt &s) { return exec_select(s); }
+            [this](const SelectStmt &s) { return exec_select(s); },
+            [this](const RevertStmt &s) { return exec_revert(s); }
         },
         stmt);
 }
@@ -483,6 +548,12 @@ std::string Executor::exec_select(const SelectStmt &s) {
     }
 
     return rows_to_json(rows, output_names);
+}
+
+std::string Executor::exec_revert(const RevertStmt &s) {
+    Table &table = resolve_table(s.db_name, s.table_name);
+    const std::size_t changed = table.revert_to(parse_timestamp_ms(s.timestamp));
+    return count_json("revert", changed).dump();
 }
 
 // endregion

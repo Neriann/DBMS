@@ -50,6 +50,7 @@
 %token <std::string> IDENT
 %token <std::string> STRING_LIT
 %token <std::string> INT_LIT
+%token <std::string> TIMESTAMP_LIT
 %token NULL_LIT
 
 %token KW_CREATE
@@ -80,6 +81,7 @@
 %token KW_LIKE
 %token KW_INT
 %token KW_STRING
+%token KW_REVERT
 
 %token LPAREN
 %token RPAREN
@@ -191,6 +193,11 @@ statement:
     | KW_SELECT select_list KW_FROM table_ref opt_where SEMICOLON
         {
             $$ = SelectStmt{std::move($4.first), std::move($4.second), false, std::move($2), std::move($5)};
+        }
+
+    | KW_REVERT table_ref TIMESTAMP_LIT SEMICOLON
+        {
+            $$ = RevertStmt{std::move($2.first), std::move($2.second), std::move($3)};
         }
     ;
 

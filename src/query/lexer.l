@@ -82,6 +82,7 @@ static std::string unquote_string(const char *text, std::size_t len) {
 blank       [ \t\r\n]+
 comment     "--"[^\n]*
 string      \"([^\"\\]|\\.)*\"
+timestamp   [0-9]{4}"."[0-9]{2}"."[0-9]{2}"-"[0-9]{2}":"[0-9]{2}":"[0-9]{2}"."[0-9]{3,6}
 number      0|[1-9][0-9]*
 identifier  [a-zA-Z_][a-zA-Z0-9_]*
 
@@ -90,6 +91,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
 {blank}             { /* skip */ }
 {comment}           { /* skip */ }
 {string}            { return yy::Parser::make_STRING_LIT(unquote_string(yytext, yyleng)); }
+{timestamp}         { return yy::Parser::make_TIMESTAMP_LIT(std::string(yytext, yyleng)); }
 {number}            { return yy::Parser::make_INT_LIT(std::string(yytext, yyleng)); }
 {identifier}        {
                         const std::string text(yytext, yyleng);
@@ -124,6 +126,7 @@ identifier  [a-zA-Z_][a-zA-Z0-9_]*
                             {"like", yy::Parser::token::KW_LIKE},
                             {"int", yy::Parser::token::KW_INT},
                             {"string", yy::Parser::token::KW_STRING},
+                            {"revert", yy::Parser::token::KW_REVERT},
                             {"null", yy::Parser::token::NULL_LIT}
                         };
 

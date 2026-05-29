@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -11,6 +12,15 @@ struct Index;
 
 class Table {
 public:
+    using TimestampMillis = std::int64_t;
+
+    struct RowVersion {
+        RowID row_id{};
+        TimestampMillis timestamp_ms{};
+        Row row;
+        bool deleted = false;
+    };
+
     explicit Table(Schema schema);
 
     Table(Schema schema, std::filesystem::path indexes_dir);
@@ -69,6 +79,25 @@ public:
      */
     void erase(RowID id);
 
+    /**
+     *
+     * @param timestamp_ms restore rows to the latest version not newer than timestamp_ms
+     * @return number of row slots whose visible state changed
+     */
+    std::size_t revert_to(TimestampMillis timestamp_ms);
+
+    /**
+     *
+     * @return append-only row version journal
+     */
+    [[nodiscard]] const std::vector<RowVersion> &history() const noexcept { return history_; }
+
+    /**
+     *
+     * @param history row version journal restored from persistent storage
+     */
+    void restore_history(std::vector<RowVersion> history);
+
 private:
     friend class StorageManager;
 
@@ -76,6 +105,7 @@ private:
     std::filesystem::path indexes_dir_;
     std::vector<Row> data_;
     std::vector<bool> deleted_; // tombstone flags
+    std::vector<RowVersion> history_;
 
     std::unordered_map<std::string, std::unique_ptr<Index> > indexes_;
 
@@ -92,6 +122,12 @@ private:
      * @param deleted whether the restored slot is a tombstone
      */
     void restore_row(Row row, bool deleted);
+
+    void append_version(RowID id, const Row &row, bool deleted, TimestampMillis timestamp_ms);
+
+    void rebuild_indexes();
+
+    static TimestampMillis current_time_ms();
 
     // endregion helpers
 };

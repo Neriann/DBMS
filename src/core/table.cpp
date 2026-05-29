@@ -50,6 +50,11 @@ bool Table::is_deleted(const RowID id) const {
     return deleted_[id];
 }
 
+Table::TimestampMillis Table::current_time_ms() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 void Table::validate_row(const Row &row) const {
     if (row.size() != schema_.size()) {
         throw std::invalid_argument("Row size does not match schema");
@@ -109,11 +114,21 @@ std::vector<RowID> Table::insert_many(const std::vector<Row> &rows) {
         }
     }
 
+    const TimestampMillis timestamp_ms = current_time_ms();
+    for (RowID id = first_id; id < data_.size(); ++id) {
+        append_version(id, data_[id], false, timestamp_ms);
+    }
+
     return ids;
 }
 
 void Table::restore_row(Row row, const bool deleted) {
-    validate_row(row);
+    if (deleted && row.size() != schema_.size()) {
+        throw std::invalid_argument("Row size does not match schema");
+    }
+    if (!deleted) {
+        validate_row(row);
+    }
 
     if (!deleted) {
         for (auto &[col_name, index]: indexes_) {
@@ -169,11 +184,13 @@ void Table::update_many(std::vector<std::pair<RowID, Row> > updates) {
         }
     }
 
+    const TimestampMillis timestamp_ms = current_time_ms();
     for (auto &[id, row]: updates) {
         data_[id] = std::move(row);
         for (const auto &index: indexes_ | std::views::values) {
             index->tree.insert({data_[id][index->col_index], id});
         }
+        append_version(id, data_[id], false, timestamp_ms);
     }
 }
 
@@ -186,4 +203,100 @@ void Table::erase(const RowID id) {
         index->tree.erase(data_[id][index->col_index]);
     }
     deleted_[id] = true;
+    append_version(id, data_[id], true, current_time_ms());
+}
+
+void Table::append_version(const RowID id, const Row &row, const bool deleted, const TimestampMillis timestamp_ms) {
+    history_.push_back(RowVersion{id, timestamp_ms, row, deleted});
+}
+
+void Table::restore_history(std::vector<RowVersion> history) {
+    history_ = std::move(history);
+}
+
+void Table::rebuild_indexes() {
+    indexes_.clear();
+    for (size_t i = 0; i < schema_.size(); ++i) {
+        if (schema_[i].is_indexed()) {
+            const auto index_path = indexes_dir_ / (schema_[i].name + ".idx");
+            std::filesystem::remove(index_path);
+            indexes_[schema_[i].name] = std::make_unique<Index>(i, index_path);
+        }
+    }
+
+    for (RowID id = 0; id < data_.size(); ++id) {
+        if (deleted_[id]) {
+            continue;
+        }
+        for (auto &[col_name, index]: indexes_) {
+            const auto &value = data_[id][index->col_index];
+            if (index->tree.contains(value)) {
+                throw std::invalid_argument("Duplicate value in INDEXED column '" + col_name + "'");
+            }
+            index->tree.insert({value, id});
+        }
+    }
+}
+
+std::size_t Table::revert_to(const TimestampMillis timestamp_ms) {
+    struct State {
+        Row row;
+        bool deleted = true;
+        bool exists = false;
+    };
+
+    std::vector<State> states(data_.size());
+    for (const RowVersion &version: history_) {
+        if (version.timestamp_ms > timestamp_ms) {
+            continue;
+        }
+        if (version.row_id >= states.size()) {
+            states.resize(version.row_id + 1);
+        }
+        states[version.row_id] = State{version.row, version.deleted, true};
+    }
+
+    std::size_t changed = 0;
+    const std::size_t old_size = data_.size();
+    const std::vector<Row> old_data = data_;
+    const TimestampMillis now_ms = current_time_ms();
+    for (RowID id = 0; id < states.size(); ++id) {
+        const bool old_exists = id < old_size;
+        const bool old_deleted = !old_exists || deleted_[id];
+        const Row old_row = old_exists ? data_[id] : Row{};
+
+        const bool new_deleted = !states[id].exists || states[id].deleted;
+        const Row &new_row = states[id].row;
+
+        const bool differs = old_deleted != new_deleted
+            || (!old_deleted && !new_deleted && old_row != new_row);
+        if (differs) {
+            ++changed;
+        }
+    }
+
+    data_.clear();
+    deleted_.clear();
+    data_.reserve(states.size());
+    deleted_.reserve(states.size());
+    for (const State &state: states) {
+        if (state.exists) {
+            validate_row(state.row);
+            data_.push_back(state.row);
+            deleted_.push_back(state.deleted);
+        } else {
+            data_.push_back(data_.size() < old_size ? old_data[data_.size()] : Row(schema_.size(), nullptr));
+            deleted_.push_back(true);
+        }
+    }
+
+    rebuild_indexes();
+
+    if (changed > 0) {
+        for (RowID id = 0; id < data_.size(); ++id) {
+            append_version(id, data_[id], deleted_[id], now_ms);
+        }
+    }
+
+    return changed;
 }
