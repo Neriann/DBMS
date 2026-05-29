@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(FLEX 2.6 REQUIRED)
 find_package(BISON 3.0 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS container date_time)
+find_package(OpenSSL REQUIRED)
 
 include(FetchContent)
 
@@ -18,6 +19,16 @@ FetchContent_Declare(
         GIT_TAG v3.12.0
         GIT_SHALLOW TRUE
 )
+
+set(JWT_EXTERNAL_NLOHMANN_JSON ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+        jwt-cpp
+        GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
+        GIT_TAG v0.7.0
+)
+
+FetchContent_MakeAvailable(jwt-cpp)
 
 set(CROW_USE_BOOST ON)
 set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -63,6 +74,11 @@ set(CORE_SOURCES
         src/storage/storage_manager.cpp
         src/core/stringpool.cpp
         src/async/task_manager.cpp
+        src/auth/auth_service.cpp
+        src/auth/jwt_service.cpp
+        src/auth/password_hasher.cpp
+        src/rbac/access_manager.cpp
+        src/rbac/permission_resolver.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )
@@ -78,7 +94,9 @@ endif ()
 set(CORE_LIBS
         dbms_b_star_plus_tree
         Boost::container
-        nlohmann_json::nlohmann_json)
+        nlohmann_json::nlohmann_json
+        jwt-cpp::jwt-cpp
+        OpenSSL::Crypto)
 
 add_library(dbms_core ${CORE_SOURCES})
 target_include_directories(dbms_core
@@ -95,8 +113,10 @@ target_link_libraries(dbms PRIVATE dbms_core)
 # HTTP server
 add_executable(dbms_server
         src/server.cpp
-        src/server/access_logger.cpp
-        src/server/telemetry.cpp)
+        src/server/middleware/access_logger.cpp
+        src/server/middleware/telemetry.cpp
+        src/server/routes/auth_routes.cpp
+        src/server/middleware/auth_middleware.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 
