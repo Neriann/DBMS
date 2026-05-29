@@ -98,6 +98,12 @@ add_executable(dbms_server
         src/server/telemetry.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
+
+add_executable(entrypointer
+    src/server/entrypoint.cpp
+)
+target_link_libraries(entrypointer PRIVATE dbms_core Crow::Crow)
+
 # HTTP client
 add_executable(dbms_client src/client.cpp)
 
