@@ -76,6 +76,11 @@ int main(const int argc, char **argv) {
             response.set_header("Content-Type", "application/json");
             return response;
         });
+    
+    CROW_ROUTE(app, "/heartbeat").methods(crow::HTTPMethod::Get)(
+        [] {
+            return crow::response(200, "OK");
+        });
 
     std::cout << "dbms_server listening on port " << port
             << ", data dir: " << data_dir
