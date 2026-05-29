@@ -1,4 +1,5 @@
 #include "storage/serializer.hpp"
+#include "value_test_utils.hpp"
 
 #include "gtest/gtest.h"
 
@@ -24,7 +25,7 @@ TEST(Serializer, RoundTripsString) {
 
 TEST(Serializer, RoundTripsValue) {
     std::array<std::byte, 64> buffer{};
-    const Value expected{std::string("indexed value")};
+    const Value expected{interned_value("indexed value")};
 
     storage::Serializer<Value>::write(buffer, expected);
 
@@ -33,7 +34,7 @@ TEST(Serializer, RoundTripsValue) {
 
 TEST(Serializer, RoundTripsRow) {
     std::array<std::byte, 128> buffer{};
-    const Row expected{1, std::string("abc"), nullptr};
+    const Row expected{1, interned_value("abc"), nullptr};
 
     storage::Serializer<Row>::write(buffer, expected);
 

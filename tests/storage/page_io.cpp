@@ -1,4 +1,5 @@
 #include "storage/page_io.hpp"
+#include "value_test_utils.hpp"
 
 #include "gtest/gtest.h"
 
@@ -27,13 +28,13 @@ TEST(PageIO, WritesAndReadsSerializedValuesInFixedSlots) {
 
     writer.write_serialized<std::string>("hello", 64);
     writer.write_serialized<Value>(Value{42}, 32);
-    writer.write_serialized<Row>(Row{1, std::string("abc"), nullptr}, 128);
+    writer.write_serialized<Row>(Row{1, interned_value("abc"), nullptr}, 128);
 
     storage::PageReader reader(page);
 
     EXPECT_EQ(reader.read_serialized<std::string>(64), "hello");
     EXPECT_EQ(reader.read_serialized<Value>(32), Value{42});
-    EXPECT_EQ(reader.read_serialized<Row>(128), (Row{1, std::string("abc"), nullptr}));
+    EXPECT_EQ(reader.read_serialized<Row>(128), (Row{1, interned_value("abc"), nullptr}));
 }
 
 TEST(PageIO, SupportsSeekAndRawBytes) {

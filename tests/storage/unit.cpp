@@ -2,6 +2,7 @@
 #include "core/table.hpp"
 #include "core/dbms.hpp"
 #include "core/database.hpp"
+#include "value_test_utils.hpp"
 #include <gtest/gtest.h>
 
 TEST(StorageManager, LoadSave) {
@@ -16,8 +17,8 @@ TEST(StorageManager, LoadSave) {
         db->create_table("t1", s);
 
         auto &t1 = db->get_table("t1");
-        t1.insert({42, std::string("hello")});
-        t1.insert({100, std::string("world")});
+        t1.insert({42, interned_value("hello")});
+        t1.insert({100, interned_value("world")});
 
         StorageManager sm(test_dir);
         sm.save_database(*db);
@@ -34,9 +35,9 @@ TEST(StorageManager, LoadSave) {
 
         ASSERT_EQ(t1_load.data().size(), 2);
         EXPECT_EQ(std::get<int>(t1_load.data()[0][0]), 42);
-        EXPECT_EQ(std::get<std::string>(t1_load.data()[0][1]), "hello");
+        EXPECT_EQ(interned_string(t1_load.data()[0][1]), "hello");
         EXPECT_EQ(std::get<int>(t1_load.data()[1][0]), 100);
-        EXPECT_EQ(std::get<std::string>(t1_load.data()[1][1]), "world");
+        EXPECT_EQ(interned_string(t1_load.data()[1][1]), "world");
     }
 }
 
@@ -52,8 +53,8 @@ TEST(StorageManager, LoadWithDeletedRows) {
         db->create_table("t1", s);
 
         auto &t1 = db->get_table("t1");
-        t1.insert({1, std::string("deleted")});
-        t1.insert({2, std::string("kept")});
+        t1.insert({1, interned_value("deleted")});
+        t1.insert({2, interned_value("kept")});
         t1.erase(0);
 
         StorageManager sm(test_dir);
@@ -74,8 +75,8 @@ TEST(StorageManager, LoadWithDeletedRows) {
         EXPECT_FALSE(t1_load.is_deleted(1));
         EXPECT_EQ(std::get<int>(t1_load.data()[1][0]), 2);
 
-        EXPECT_THROW(t1_load.update(0, {1, std::string("still deleted")}), std::out_of_range);
-        EXPECT_NO_THROW(t1_load.update(1, {3, std::string("updated")}));
+        EXPECT_THROW(t1_load.update(0, {1, interned_value("still deleted")}), std::out_of_range);
+        EXPECT_NO_THROW(t1_load.update(1, {3, interned_value("updated")}));
     }
 }
 
@@ -91,8 +92,8 @@ TEST(StorageManager, SaveEntireDbms) {
         db->create_table("users", {{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
         db->create_table("notes", {{"body", ColumnType::STRING, NONE}, {"rank", ColumnType::INT, NONE}});
 
-        db->get_table("users").insert({1, std::string("Sebastian")});
-        db->get_table("notes").insert({std::string("hello"), 10});
+        db->get_table("users").insert({1, interned_value("Sebastian")});
+        db->get_table("notes").insert({interned_value("hello"), 10});
 
         StorageManager sm(test_dir);
         sm.save(dbms);
@@ -110,10 +111,10 @@ TEST(StorageManager, SaveEntireDbms) {
 
         ASSERT_EQ(users.data().size(), 1);
         EXPECT_EQ(std::get<int>(users.data()[0][0]), 1);
-        EXPECT_EQ(std::get<std::string>(users.data()[0][1]), "Sebastian");
+        EXPECT_EQ(interned_string(users.data()[0][1]), "Sebastian");
 
         ASSERT_EQ(notes.data().size(), 1);
-        EXPECT_EQ(std::get<std::string>(notes.data()[0][0]), "hello");
+        EXPECT_EQ(interned_string(notes.data()[0][0]), "hello");
         EXPECT_EQ(std::get<int>(notes.data()[0][1]), 10);
     }
 }
@@ -151,8 +152,8 @@ TEST(Table, InsertManyDuplicateIndexedValues) {
     EXPECT_THROW(
         {
         table.insert_many(std::vector<Row>{
-            {1, std::string("Ann")}
-            ,{1, std::string("Duplicate")}
+            {1, interned_value("Ann")}
+            ,{1, interned_value("Duplicate")}
             });
         },
         std::invalid_argument
@@ -164,15 +165,15 @@ TEST(Table, InsertManyDuplicateIndexedValues) {
 TEST(Table, UpdateManyDuplicateFinalIndexedValues) {
     Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
     table.insert_many({
-        {1, std::string("Ann")},
-        {2, std::string("Bob")}
+        {1, interned_value("Ann")},
+        {2, interned_value("Bob")}
     });
 
     EXPECT_THROW(
         {
         table.update_many(std::vector<std::pair<RowID, Row> >{
-            {0, {3, std::string("Ann")}},
-            {1, {3, std::string("Bob")}}
+            {0, {3, interned_value("Ann")}},
+            {1, {3, interned_value("Bob")}}
             });
         },
         std::invalid_argument
@@ -186,15 +187,15 @@ TEST(Table, UpdateManyDuplicateFinalIndexedValues) {
 TEST(Table, UpdateManyAllowsIndexedValueSwap) {
     Table table({{"id", ColumnType::INT, INDEXED}, {"name", ColumnType::STRING, NONE}});
     table.insert_many({
-        {1, std::string("Ann")},
-        {2, std::string("Bob")}
+        {1, interned_value("Ann")},
+        {2, interned_value("Bob")}
     });
 
     EXPECT_NO_THROW(
         {
         table.update_many(std::vector<std::pair<RowID, Row> >{
-            {0, {2, std::string("Ann")}},
-            {1, {1, std::string("Bob")}}
+            {0, {2, interned_value("Ann")}},
+            {1, {1, interned_value("Bob")}}
             });
         }
     );

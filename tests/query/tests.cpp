@@ -2,6 +2,7 @@
 #include "query/scanner.hpp"
 #include "parser.hpp"
 #include "query/executor.hpp"
+#include "../storage/value_test_utils.hpp"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -106,7 +107,7 @@ TEST(QueryParser, ParsesDefaultColumnAttributes) {
     EXPECT_EQ(std::get<int>(*create.schema[0].default_value), 1);
 
     ASSERT_TRUE(create.schema[1].default_value.has_value());
-    EXPECT_EQ(std::get<std::string>(*create.schema[1].default_value), "unknown");
+    EXPECT_EQ(interned_string(*create.schema[1].default_value), "unknown");
 
     ASSERT_TRUE(create.schema[2].default_value.has_value());
     EXPECT_TRUE(std::holds_alternative<std::nullptr_t>(*create.schema[2].default_value));
