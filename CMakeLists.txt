@@ -8,9 +8,6 @@ find_package(FLEX 2.6 REQUIRED)
 find_package(BISON 3.0 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS container date_time)
 
-set(DBMS_TREE_BSP 4)
-set(INDEX_TREE_LIB dbms_b_star_plus_tree)
-
 include(FetchContent)
 
 set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
@@ -78,13 +75,9 @@ if (FLEX_INCLUDE_DIRS)
 endif ()
 
 set(CORE_LIBS
-        ${INDEX_TREE_LIB}
+        dbms_b_star_plus_tree
         Boost::container
         nlohmann_json::nlohmann_json)
-
-set(CORE_COMPILE_DEFS
-        DBMS_TREE_BSP=${DBMS_TREE_BSP}
-        DBMS_INDEX_TREE=${DBMS_TREE_BSP})
 
 add_library(dbms_core ${CORE_SOURCES})
 target_include_directories(dbms_core
@@ -93,7 +86,6 @@ target_include_directories(dbms_core
 target_link_libraries(dbms_core
         PUBLIC
         ${CORE_LIBS})
-target_compile_definitions(dbms_core PUBLIC ${CORE_COMPILE_DEFS})
 
 # CLI
 add_executable(dbms src/main.cpp)
