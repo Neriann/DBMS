@@ -50,6 +50,51 @@ bool Table::is_deleted(const RowID id) const {
     return deleted_[id];
 }
 
+bool Table::has_index(const std::string &column_name) const noexcept {
+    return indexes_.contains(column_name);
+}
+
+std::vector<RowID> Table::find_indexed(const std::string &column_name, const Value &value) const {
+    const auto index_it = indexes_.find(column_name);
+    if (index_it == indexes_.end()) {
+        return {};
+    }
+
+    const auto &tree = index_it->second->tree;
+    const auto row_it = tree.find(value);
+    if (row_it == tree.end()) {
+        return {};
+    }
+
+    return {row_it->second};
+}
+
+std::vector<RowID> Table::range_indexed(
+    const std::string &column_name,
+    const std::optional<Value> &lower,
+    const bool lower_inclusive,
+    const std::optional<Value> &upper,
+    const bool upper_inclusive) const {
+    const auto index_it = indexes_.find(column_name);
+    if (index_it == indexes_.end()) {
+        return {};
+    }
+
+    const auto &tree = index_it->second->tree;
+    auto begin = lower
+        ? (lower_inclusive ? tree.lower_bound(*lower) : tree.upper_bound(*lower))
+        : tree.begin();
+    const auto end = upper
+        ? (upper_inclusive ? tree.upper_bound(*upper) : tree.lower_bound(*upper))
+        : tree.end();
+
+    std::vector<RowID> row_ids;
+    for (auto it = begin; it != end; ++it) {
+        row_ids.push_back(it->second);
+    }
+    return row_ids;
+}
+
 Table::TimestampMillis Table::current_time_ms() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();

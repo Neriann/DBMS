@@ -1,10 +1,13 @@
 #include "query/executor.hpp"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <iterator>
 #include <chrono>
 #include <cstdio>
 #include <ctime>
 #include <limits>
+#include <optional>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -129,8 +132,8 @@ int compare_values(const Value &lhs, const Value &rhs) {
         return (l > r) - (l < r);
     }
 
-    const std::string &l = global_string_pool().get(std::get<InternedString>(lhs).id);
-    const std::string &r = global_string_pool().get(std::get<InternedString>(rhs).id);
+    const std::string &l = std::get<std::string>(lhs);
+    const std::string &r = std::get<std::string>(rhs);
     return (l > r) - (l < r);
 }
 
@@ -142,7 +145,7 @@ nlohmann::json value_to_json(const Value &value) {
     return std::visit(
         Overloaded{
             [](const int v) -> nlohmann::json { return v; },
-            [](const InternedString &v) -> nlohmann::json { return global_string_pool().get(v.id); },
+            [](const std::string &v) -> nlohmann::json { return v; },
             [](std::nullptr_t) -> nlohmann::json { return nullptr; }
         },
         value);
@@ -159,7 +162,7 @@ void validate_default_value(const Column &column, const Value &value) {
     if (column.type == ColumnType::INT && !std::holds_alternative<int>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be INT");
     }
-    if (column.type == ColumnType::STRING && !std::holds_alternative<InternedString>(value)) {
+    if (column.type == ColumnType::STRING && !std::holds_alternative<std::string>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
@@ -259,6 +262,225 @@ nlohmann::json eval_aggregate(
     }
 
     throw std::runtime_error("Unknown aggregate function");
+}
+
+std::vector<RowID> all_active_row_ids(const Table &table) {
+    std::vector<RowID> row_ids;
+    row_ids.reserve(table.data().size());
+    for (RowID id = 0; id < table.data().size(); ++id) {
+        if (!table.is_deleted(id)) {
+            row_ids.push_back(id);
+        }
+    }
+    return row_ids;
+}
+
+std::vector<RowID> normalize_active_row_ids(const Table &table, std::vector<RowID> row_ids) {
+    const auto row_count = table.data().size();
+    std::erase_if(row_ids, [&](const RowID id) {
+        return id >= row_count || table.is_deleted(id);
+    });
+
+    std::ranges::sort(row_ids);
+    const auto duplicate_begin = std::ranges::unique(row_ids).begin();
+    row_ids.erase(duplicate_begin, row_ids.end());
+    return row_ids;
+}
+
+std::optional<Value> literal_value_of(const Expr &expr) {
+    if (expr.kind != ExprKind::Literal) {
+        return std::nullopt;
+    }
+    return expr.literal;
+}
+
+std::optional<std::string> column_name_of(const Expr &expr) {
+    if (expr.kind != ExprKind::Column) {
+        return std::nullopt;
+    }
+    return expr.column;
+}
+
+CmpOp reverse_cmp_op(const CmpOp op) {
+    switch (op) {
+        case CmpOp::EQ:
+            return CmpOp::EQ;
+        case CmpOp::NEQ:
+            return CmpOp::NEQ;
+        case CmpOp::LT:
+            return CmpOp::GT;
+        case CmpOp::GT:
+            return CmpOp::LT;
+        case CmpOp::LEQ:
+            return CmpOp::GEQ;
+        case CmpOp::GEQ:
+            return CmpOp::LEQ;
+    }
+
+    throw std::runtime_error("Unknown comparison operator");
+}
+
+bool value_matches_column_type(const Value &value, const ColumnType type) {
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+        return false;
+    }
+    if (type == ColumnType::INT) {
+        return std::holds_alternative<int>(value);
+    }
+    return std::holds_alternative<std::string>(value);
+}
+
+std::optional<ColumnType> lookup_column_type(
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::string &column) {
+    const auto it = column_indexes.find(column);
+    if (it == column_indexes.end()) {
+        return std::nullopt;
+    }
+    return schema[static_cast<std::size_t>(it->second)].type;
+}
+
+std::optional<std::vector<RowID>> indexed_simple_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const Predicate &predicate) {
+    std::optional<std::string> column = column_name_of(predicate.lhs);
+    std::optional<Value> value = literal_value_of(predicate.rhs);
+    CmpOp op = predicate.op;
+
+    if (!column || !value) {
+        column = column_name_of(predicate.rhs);
+        value = literal_value_of(predicate.lhs);
+        op = reverse_cmp_op(predicate.op);
+    }
+
+    if (!column || !value || !table.has_index(*column)) {
+        return std::nullopt;
+    }
+
+    if (op == CmpOp::EQ) {
+        return table.find_indexed(*column, *value);
+    }
+
+    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+    if (op == CmpOp::NEQ || !type || !value_matches_column_type(*value, *type)) {
+        return std::nullopt;
+    }
+
+    switch (op) {
+        case CmpOp::LT:
+            return table.range_indexed(*column, std::nullopt, true, *value, false);
+        case CmpOp::LEQ:
+            return table.range_indexed(*column, std::nullopt, true, *value, true);
+        case CmpOp::GT:
+            return table.range_indexed(*column, *value, false, std::nullopt, true);
+        case CmpOp::GEQ:
+            return table.range_indexed(*column, *value, true, std::nullopt, true);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<RowID>> indexed_between_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const BetweenPredicate &between) {
+    const std::optional<std::string> column = column_name_of(between.lhs);
+    const std::optional<Value> lower = literal_value_of(between.lo);
+    const std::optional<Value> upper = literal_value_of(between.hi);
+    if (!column || !lower || !upper || !table.has_index(*column)) {
+        return std::nullopt;
+    }
+
+    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+    if (!type || !value_matches_column_type(*lower, *type) || !value_matches_column_type(*upper, *type)) {
+        return std::nullopt;
+    }
+
+    return table.range_indexed(*column, *lower, true, *upper, false);
+}
+
+std::vector<RowID> intersect_row_ids(std::vector<RowID> lhs, std::vector<RowID> rhs) {
+    std::ranges::sort(lhs);
+    std::ranges::sort(rhs);
+
+    std::vector<RowID> result;
+    std::ranges::set_intersection(lhs, rhs, std::back_inserter(result));
+    return result;
+}
+
+std::vector<RowID> union_row_ids(std::vector<RowID> lhs, std::vector<RowID> rhs) {
+    std::ranges::sort(lhs);
+    std::ranges::sort(rhs);
+
+    std::vector<RowID> result;
+    std::ranges::set_union(lhs, rhs, std::back_inserter(result));
+    return result;
+}
+
+std::optional<std::vector<RowID>> indexed_condition_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const Condition &condition) {
+    switch (condition.kind) {
+        case ConditionKind::Simple:
+            if (!condition.predicate) {
+                throw std::runtime_error("Malformed simple condition");
+            }
+            return indexed_simple_candidates(table, schema, column_indexes, *condition.predicate);
+
+        case ConditionKind::Between:
+            if (!condition.between) {
+                throw std::runtime_error("Malformed BETWEEN condition");
+            }
+            return indexed_between_candidates(table, schema, column_indexes, *condition.between);
+
+        case ConditionKind::And: {
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed AND condition");
+            }
+            auto left = indexed_condition_candidates(table, schema, column_indexes, *condition.left);
+            auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
+            if (left && right) {
+                return intersect_row_ids(std::move(*left), std::move(*right));
+            }
+            return left ? std::move(left) : std::move(right);
+        }
+
+        case ConditionKind::Or: {
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed OR condition");
+            }
+            auto left = indexed_condition_candidates(table, schema, column_indexes, *condition.left);
+            auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
+            if (left && right) {
+                return union_row_ids(std::move(*left), std::move(*right));
+            }
+            return std::nullopt;
+        }
+
+        case ConditionKind::Like:
+            return std::nullopt;
+    }
+
+    throw std::runtime_error("Unknown condition kind");
+}
+
+std::vector<RowID> candidate_row_ids(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::optional<Condition> &where) {
+    if (!where) {
+        return all_active_row_ids(table);
+    }
+
+    auto candidates = indexed_condition_candidates(table, schema, column_indexes, *where);
+    return candidates ? normalize_active_row_ids(table, std::move(*candidates)) : all_active_row_ids(table);
 }
 
 } // namespace
@@ -418,10 +640,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
 
     std::vector<std::pair<RowID, Row>> updates;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
@@ -446,10 +665,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
@@ -471,10 +687,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
