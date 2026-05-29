@@ -17,6 +17,8 @@
 
 namespace {
 
+// region Common Helpers
+
 template <class... Ts>
 struct Overloaded : Ts... {
     using Ts::operator()...;
@@ -25,6 +27,10 @@ struct Overloaded : Ts... {
 template <class... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
 
+// endregion
+
+// region JSON Helpers
+
 nlohmann::json ok_json(const std::string &message) {
     return nlohmann::json{{"status", "ok"}, {"message", message}};
 }
@@ -32,6 +38,10 @@ nlohmann::json ok_json(const std::string &message) {
 nlohmann::json count_json(const std::string &operation, const std::size_t count) {
     return nlohmann::json{{"status", "ok"}, {"operation", operation}, {"count", count}};
 }
+
+// endregion
+
+// region Timestamp Helpers
 
 Table::TimestampMillis parse_timestamp_ms(const std::string &text) {
     int year = 0;
@@ -94,6 +104,10 @@ Table::TimestampMillis parse_timestamp_ms(const std::string &text) {
     return static_cast<Table::TimestampMillis>(seconds_since_epoch) * 1000 + milliseconds;
 }
 
+// endregion
+
+// region Schema Helpers
+
 std::unordered_map<std::string, int> build_column_index_map(const Schema &schema) {
     std::unordered_map<std::string, int> indexes;
     indexes.reserve(schema.size());
@@ -119,36 +133,25 @@ void ensure_no_duplicate(const std::set<std::string> &names, const std::string &
     }
 }
 
-int compare_values(const Value &lhs, const Value &rhs) {
-    if (lhs.index() != rhs.index()) {
-        throw std::runtime_error("Cannot compare values of different types");
+bool value_matches_column_type(const Value &value, const ColumnType type) {
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+        return false;
     }
-    if (std::holds_alternative<std::nullptr_t>(lhs)) {
-        throw std::runtime_error("Cannot order NULL values");
+    if (type == ColumnType::INT) {
+        return std::holds_alternative<int>(value);
     }
-    if (std::holds_alternative<int>(lhs)) {
-        const int l = std::get<int>(lhs);
-        const int r = std::get<int>(rhs);
-        return (l > r) - (l < r);
-    }
-
-    const std::string &l = std::get<std::string>(lhs);
-    const std::string &r = std::get<std::string>(rhs);
-    return (l > r) - (l < r);
+    return std::holds_alternative<InternedString>(value);
 }
 
-const std::string &interned_value_to_string(const Value &value) {
-    return global_string_pool().get(std::get<InternedString>(value).id);
-}
-
-nlohmann::json value_to_json(const Value &value) {
-    return std::visit(
-        Overloaded{
-            [](const int v) -> nlohmann::json { return v; },
-            [](const std::string &v) -> nlohmann::json { return v; },
-            [](std::nullptr_t) -> nlohmann::json { return nullptr; }
-        },
-        value);
+std::optional<ColumnType> lookup_column_type(
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::string &column) {
+    const auto it = column_indexes.find(column);
+    if (it == column_indexes.end()) {
+        return std::nullopt;
+    }
+    return schema[static_cast<std::size_t>(it->second)].type;
 }
 
 void validate_default_value(const Column &column, const Value &value) {
@@ -162,10 +165,54 @@ void validate_default_value(const Column &column, const Value &value) {
     if (column.type == ColumnType::INT && !std::holds_alternative<int>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be INT");
     }
-    if (column.type == ColumnType::STRING && !std::holds_alternative<std::string>(value)) {
+    if (column.type == ColumnType::STRING && !std::holds_alternative<InternedString>(value)) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
+
+// endregion
+
+// region Value Helpers
+
+const std::string &interned_value_to_string(const Value &value);
+
+int compare_values(const Value &lhs, const Value &rhs) {
+    if (lhs.index() != rhs.index()) {
+        throw std::runtime_error("Cannot compare values of different types");
+    }
+    if (std::holds_alternative<std::nullptr_t>(lhs)) {
+        throw std::runtime_error("Cannot order NULL values");
+    }
+    if (std::holds_alternative<int>(lhs)) {
+        const int l = std::get<int>(lhs);
+        const int r = std::get<int>(rhs);
+        return (l > r) - (l < r);
+    }
+
+    const std::string &l = interned_value_to_string(lhs);
+    const std::string &r = interned_value_to_string(rhs);
+    return (l > r) - (l < r);
+}
+
+const std::string &interned_value_to_string(const Value &value) {
+    return global_string_pool().get(std::get<InternedString>(value).id);
+}
+
+nlohmann::json value_to_json(const Value &value) {
+    return std::visit(
+        Overloaded{
+            [](const int v) -> nlohmann::json { return v; },
+            [](const InternedString &v) -> nlohmann::json {
+                return global_string_pool().get(v.id);
+            },
+            [](std::nullptr_t) -> nlohmann::json { return nullptr; }
+        },
+        value);
+}
+
+// endregion
+
+// region Select Helpers
 
 std::string aggregate_function_name(const AggregateFunction function) {
     switch (function) {
@@ -264,6 +311,10 @@ nlohmann::json eval_aggregate(
     throw std::runtime_error("Unknown aggregate function");
 }
 
+// endregion
+
+// region Indexed Row Lookup Helpers
+
 std::vector<RowID> all_active_row_ids(const Table &table) {
     std::vector<RowID> row_ids;
     row_ids.reserve(table.data().size());
@@ -318,27 +369,6 @@ CmpOp reverse_cmp_op(const CmpOp op) {
     }
 
     throw std::runtime_error("Unknown comparison operator");
-}
-
-bool value_matches_column_type(const Value &value, const ColumnType type) {
-    if (std::holds_alternative<std::nullptr_t>(value)) {
-        return false;
-    }
-    if (type == ColumnType::INT) {
-        return std::holds_alternative<int>(value);
-    }
-    return std::holds_alternative<std::string>(value);
-}
-
-std::optional<ColumnType> lookup_column_type(
-    const Schema &schema,
-    const std::unordered_map<std::string, int> &column_indexes,
-    const std::string &column) {
-    const auto it = column_indexes.find(column);
-    if (it == column_indexes.end()) {
-        return std::nullopt;
-    }
-    return schema[static_cast<std::size_t>(it->second)].type;
 }
 
 std::optional<std::vector<RowID>> indexed_simple_candidates(
@@ -483,16 +513,18 @@ std::vector<RowID> candidate_row_ids(
     return candidates ? normalize_active_row_ids(table, std::move(*candidates)) : all_active_row_ids(table);
 }
 
+// endregion
+
 } // namespace
 
-// region Lifecycle
+// region Executor Lifecycle
 
 Executor::Executor(DBMS &dbms) : dbms_(dbms) {
 }
 
 // endregion
 
-// region Core
+// region Statement Dispatch
 
 std::string Executor::execute(const Statement &stmt) {
     return std::visit(
@@ -513,7 +545,7 @@ std::string Executor::execute(const Statement &stmt) {
 
 // endregion
 
-// region Utilities
+// region Resolution Helpers
 
 Database &Executor::resolve_db(const std::string &db_name) {
     if (!db_name.empty()) {
@@ -533,7 +565,7 @@ Table &Executor::resolve_table(const std::string &db_name, const std::string &ta
 
 // endregion
 
-// region Database Operations
+// region Database Statement Executors
 
 std::string Executor::exec_create_database(const CreateDatabaseStmt &s) const {
     dbms_.create_database(s.db_name);
@@ -552,7 +584,7 @@ std::string Executor::exec_use(const UseStmt &s) const {
 
 // endregion
 
-// region Table Operations
+// region Table Statement Executors
 
 std::string Executor::exec_create_table(const CreateTableStmt &s) {
     Database &db = resolve_db(s.db_name);
@@ -579,7 +611,7 @@ std::string Executor::exec_drop_table(const DropTableStmt &s) {
 
 // endregion
 
-// region Row Operations
+// region Row Statement Executors
 
 std::string Executor::exec_insert(const InsertStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
@@ -771,7 +803,7 @@ std::string Executor::exec_revert(const RevertStmt &s) {
 
 // endregion
 
-// region Evaluation
+// region Condition And Expression Evaluation
 
 bool Executor::eval_condition(
     const Condition &cond,
@@ -892,7 +924,7 @@ Value Executor::eval_expr(
 
 // endregion
 
-// region Serialization
+// region Result Serialization
 
 std::string Executor::rows_to_json(const std::vector<Row> &rows, const std::vector<std::string> &col_names) {
     nlohmann::json result = nlohmann::json::array();
