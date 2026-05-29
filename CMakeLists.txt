@@ -11,24 +11,11 @@ find_package(OpenSSL REQUIRED)
 
 include(FetchContent)
 
-set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-set(JSON_Install OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json
-        GIT_TAG v3.12.0
-        GIT_SHALLOW TRUE
-)
-
-set(JWT_EXTERNAL_NLOHMANN_JSON ON CACHE BOOL "" FORCE)
-
 FetchContent_Declare(
         jwt-cpp
         GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
         GIT_TAG v0.7.0
 )
-
-FetchContent_MakeAvailable(jwt-cpp)
 
 set(CROW_USE_BOOST ON)
 set(CROW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
@@ -41,7 +28,7 @@ FetchContent_Declare(
         GIT_SHALLOW TRUE
 )
 
-FetchContent_MakeAvailable(nlohmann_json Crow)
+FetchContent_MakeAvailable(jwt-cpp Crow)
 
 add_library(dbms_b_star_plus_tree INTERFACE)
 target_include_directories(dbms_b_star_plus_tree
