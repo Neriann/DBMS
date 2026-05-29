@@ -101,7 +101,9 @@ target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 
 add_executable(entrypointer
+    src/entrypoint_main.cpp
     src/server/entrypoint.cpp
+    src/server/heartbeat.cpp
 )
 target_link_libraries(entrypointer PRIVATE dbms_core Crow::Crow)
 
