@@ -62,6 +62,7 @@ set(CORE_SOURCES
         src/storage/serializer.cpp
         src/storage/storage_manager.cpp
         src/core/stringpool.cpp
+        src/async/task_manager.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )

@@ -6,6 +6,11 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/google/googletest.git
         GIT_TAG v1.17.0
 )
+
+# -------------------------
+# UNIT TESTS (у тебя уже есть)
+# -------------------------
+
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -35,6 +40,25 @@ target_link_libraries(access_logger_test PRIVATE Crow::Crow nlohmann_json::nlohm
 add_executable(query_tests query/tests.cpp)
 target_link_libraries(query_tests PRIVATE dbms_core gtest gtest_main)
 target_include_directories(query_tests PRIVATE ${gtest_SOURCE_DIR}/include)
+
+
+# -------------------------
+# ASYNC TESTS
+# -------------------------
+
+add_executable(task_manager_test
+    async/task_manager_test.cpp
+)
+target_link_libraries(task_manager_test PRIVATE dbms_core gtest_main)
+
+add_executable(api_async_test
+    async/api_async_test.cpp
+)
+target_link_libraries(api_async_test PRIVATE dbms_core)
+
+# -------------------------
+# TEST DISCOVERY
+# -------------------------
 
 include(GoogleTest)
 gtest_discover_tests(storage_unit_test)
