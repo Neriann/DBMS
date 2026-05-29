@@ -14,9 +14,8 @@ bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
     if (std::holds_alternative<InternedString>(lhs)) {
         const auto& l = std::get<InternedString>(lhs);
         const auto& r = std::get<InternedString>(rhs);
-
-        // ключевая идея string interning:
-        return l.id < r.id;
+        const StringPool& pool = pool_ == nullptr ? global_string_pool() : *pool_;
+        return pool.get(l.id) < pool.get(r.id);
     }
 
     // nullptr == nullptr

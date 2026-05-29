@@ -1,10 +1,14 @@
 #include "query/executor.hpp"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <iterator>
 #include <chrono>
 #include <cstdio>
 #include <ctime>
 #include <limits>
+#include <optional>
+#include <ranges>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -14,6 +18,8 @@
 
 namespace {
 
+// region Common Helpers
+
 template <class... Ts>
 struct Overloaded : Ts... {
     using Ts::operator()...;
@@ -22,6 +28,10 @@ struct Overloaded : Ts... {
 template <class... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
 
+// endregion
+
+// region JSON Helpers
+
 nlohmann::json ok_json(const std::string &message) {
     return nlohmann::json{{"status", "ok"}, {"message", message}};
 }
@@ -29,6 +39,10 @@ nlohmann::json ok_json(const std::string &message) {
 nlohmann::json count_json(const std::string &operation, const std::size_t count) {
     return nlohmann::json{{"status", "ok"}, {"operation", operation}, {"count", count}};
 }
+
+// endregion
+
+// region Timestamp Helpers
 
 Table::TimestampMillis parse_timestamp_ms(const std::string &text) {
     int year = 0;
@@ -91,6 +105,10 @@ Table::TimestampMillis parse_timestamp_ms(const std::string &text) {
     return static_cast<Table::TimestampMillis>(seconds_since_epoch) * 1000 + milliseconds;
 }
 
+// endregion
+
+// region Schema Helpers
+
 std::unordered_map<std::string, int> build_column_index_map(const Schema &schema) {
     std::unordered_map<std::string, int> indexes;
     indexes.reserve(schema.size());
@@ -116,36 +134,25 @@ void ensure_no_duplicate(const std::set<std::string> &names, const std::string &
     }
 }
 
-int compare_values(const Value &lhs, const Value &rhs) {
-    if (lhs.index() != rhs.index()) {
-        throw std::runtime_error("Cannot compare values of different types");
+bool value_matches_column_type(const Value &value, const ColumnType type) {
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+        return false;
     }
-    if (std::holds_alternative<std::nullptr_t>(lhs)) {
-        throw std::runtime_error("Cannot order NULL values");
+    if (type == ColumnType::INT) {
+        return std::holds_alternative<int>(value);
     }
-    if (std::holds_alternative<int>(lhs)) {
-        const int l = std::get<int>(lhs);
-        const int r = std::get<int>(rhs);
-        return (l > r) - (l < r);
-    }
-
-    const std::string &l = global_string_pool().get(std::get<InternedString>(lhs).id);
-    const std::string &r = global_string_pool().get(std::get<InternedString>(rhs).id);
-    return (l > r) - (l < r);
+    return std::holds_alternative<InternedString>(value);
 }
 
-const std::string &interned_value_to_string(const Value &value) {
-    return global_string_pool().get(std::get<InternedString>(value).id);
-}
-
-nlohmann::json value_to_json(const Value &value) {
-    return std::visit(
-        Overloaded{
-            [](const int v) -> nlohmann::json { return v; },
-            [](const InternedString &v) -> nlohmann::json { return global_string_pool().get(v.id); },
-            [](std::nullptr_t) -> nlohmann::json { return nullptr; }
-        },
-        value);
+std::optional<ColumnType> lookup_column_type(
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::string &column) {
+    const auto it = column_indexes.find(column);
+    if (it == column_indexes.end()) {
+        return std::nullopt;
+    }
+    return schema[static_cast<std::size_t>(it->second)].type;
 }
 
 void validate_default_value(const Column &column, const Value &value) {
@@ -163,6 +170,48 @@ void validate_default_value(const Column &column, const Value &value) {
         throw std::runtime_error("DEFAULT value for column '" + column.name + "' must be STRING");
     }
 }
+
+// endregion
+
+// region Value Helpers
+
+const std::string &interned_value_to_string(const Value &value) {
+    return global_string_pool().get(std::get<InternedString>(value).id);
+}
+
+int compare_values(const Value &lhs, const Value &rhs) {
+    if (lhs.index() != rhs.index()) {
+        throw std::runtime_error("Cannot compare values of different types");
+    }
+    if (std::holds_alternative<std::nullptr_t>(lhs)) {
+        throw std::runtime_error("Cannot order NULL values");
+    }
+    if (std::holds_alternative<int>(lhs)) {
+        const int l = std::get<int>(lhs);
+        const int r = std::get<int>(rhs);
+        return (l > r) - (l < r);
+    }
+
+    const std::string &l = interned_value_to_string(lhs);
+    const std::string &r = interned_value_to_string(rhs);
+    return (l > r) - (l < r);
+}
+
+nlohmann::json value_to_json(const Value &value) {
+    return std::visit(
+        Overloaded{
+            [](const int v) -> nlohmann::json { return v; },
+            [](const InternedString &v) -> nlohmann::json {
+                return global_string_pool().get(v.id);
+            },
+            [](std::nullptr_t) -> nlohmann::json { return nullptr; }
+        },
+        value);
+}
+
+// endregion
+
+// region Select Helpers
 
 std::string aggregate_function_name(const AggregateFunction function) {
     switch (function) {
@@ -261,16 +310,222 @@ nlohmann::json eval_aggregate(
     throw std::runtime_error("Unknown aggregate function");
 }
 
+// endregion
+
+// region Indexed Row Lookup Helpers
+
+std::vector<RowID> all_active_row_ids(const Table &table) {
+    std::vector<RowID> row_ids;
+    row_ids.reserve(table.data().size());
+    for (RowID id = 0; id < table.data().size(); ++id) {
+        if (!table.is_deleted(id)) {
+            row_ids.push_back(id);
+        }
+    }
+    return row_ids;
+}
+
+std::vector<RowID> normalize_active_row_ids(const Table &table, std::vector<RowID> row_ids) {
+    const auto row_count = table.data().size();
+    std::erase_if(row_ids, [&](const RowID id) {
+        return id >= row_count || table.is_deleted(id);
+    });
+
+    std::ranges::sort(row_ids);
+    const auto duplicate_begin = std::ranges::unique(row_ids).begin();
+    row_ids.erase(duplicate_begin, row_ids.end());
+    return row_ids;
+}
+
+std::optional<Value> literal_value_of(const Expr &expr) {
+    if (expr.kind != ExprKind::Literal) {
+        return std::nullopt;
+    }
+    return expr.literal;
+}
+
+std::optional<std::string> column_name_of(const Expr &expr) {
+    if (expr.kind != ExprKind::Column) {
+        return std::nullopt;
+    }
+    return expr.column;
+}
+
+CmpOp reverse_cmp_op(const CmpOp op) {
+    switch (op) {
+        case CmpOp::EQ:
+            return CmpOp::EQ;
+        case CmpOp::NEQ:
+            return CmpOp::NEQ;
+        case CmpOp::LT:
+            return CmpOp::GT;
+        case CmpOp::GT:
+            return CmpOp::LT;
+        case CmpOp::LEQ:
+            return CmpOp::GEQ;
+        case CmpOp::GEQ:
+            return CmpOp::LEQ;
+    }
+
+    throw std::runtime_error("Unknown comparison operator");
+}
+
+std::optional<std::vector<RowID>> indexed_simple_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const Predicate &predicate) {
+    std::optional<std::string> column = column_name_of(predicate.lhs);
+    std::optional<Value> value = literal_value_of(predicate.rhs);
+    CmpOp op = predicate.op;
+
+    if (!column || !value) {
+        column = column_name_of(predicate.rhs);
+        value = literal_value_of(predicate.lhs);
+        op = reverse_cmp_op(predicate.op);
+    }
+
+    if (!column || !value || !table.has_index(*column)) {
+        return std::nullopt;
+    }
+
+    if (op == CmpOp::EQ) {
+        return table.find_indexed(*column, *value);
+    }
+
+    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+    if (op == CmpOp::NEQ || !type || !value_matches_column_type(*value, *type)) {
+        return std::nullopt;
+    }
+
+    switch (op) {
+        case CmpOp::LT:
+            return table.range_indexed(*column, std::nullopt, true, *value, false);
+        case CmpOp::LEQ:
+            return table.range_indexed(*column, std::nullopt, true, *value, true);
+        case CmpOp::GT:
+            return table.range_indexed(*column, *value, false, std::nullopt, true);
+        case CmpOp::GEQ:
+            return table.range_indexed(*column, *value, true, std::nullopt, true);
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<std::vector<RowID>> indexed_between_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const BetweenPredicate &between) {
+    const std::optional<std::string> column = column_name_of(between.lhs);
+    const std::optional<Value> lower = literal_value_of(between.lo);
+    const std::optional<Value> upper = literal_value_of(between.hi);
+    if (!column || !lower || !upper || !table.has_index(*column)) {
+        return std::nullopt;
+    }
+
+    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+    if (!type || !value_matches_column_type(*lower, *type) || !value_matches_column_type(*upper, *type)) {
+        return std::nullopt;
+    }
+
+    return table.range_indexed(*column, *lower, true, *upper, false);
+}
+
+std::vector<RowID> intersect_row_ids(std::vector<RowID> lhs, std::vector<RowID> rhs) {
+    std::ranges::sort(lhs);
+    std::ranges::sort(rhs);
+
+    std::vector<RowID> result;
+    result.reserve(std::min(lhs.size(), rhs.size()));
+    std::ranges::set_intersection(lhs, rhs, std::back_inserter(result));
+    return result;
+}
+
+std::vector<RowID> union_row_ids(std::vector<RowID> lhs, std::vector<RowID> rhs) {
+    std::ranges::sort(lhs);
+    std::ranges::sort(rhs);
+
+    std::vector<RowID> result;
+    result.reserve(lhs.size() + rhs.size());
+    std::ranges::set_union(lhs, rhs, std::back_inserter(result));
+    return result;
+}
+
+std::optional<std::vector<RowID>> indexed_condition_candidates(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const Condition &condition) {
+    switch (condition.kind) {
+        case ConditionKind::Simple:
+            if (!condition.predicate) {
+                throw std::runtime_error("Malformed simple condition");
+            }
+            return indexed_simple_candidates(table, schema, column_indexes, *condition.predicate);
+
+        case ConditionKind::Between:
+            if (!condition.between) {
+                throw std::runtime_error("Malformed BETWEEN condition");
+            }
+            return indexed_between_candidates(table, schema, column_indexes, *condition.between);
+
+        case ConditionKind::And: {
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed AND condition");
+            }
+            auto left = indexed_condition_candidates(table, schema, column_indexes, *condition.left);
+            auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
+            if (left && right) {
+                return intersect_row_ids(std::move(*left), std::move(*right));
+            }
+            return left ? std::move(left) : std::move(right);
+        }
+
+        case ConditionKind::Or: {
+            if (!condition.left || !condition.right) {
+                throw std::runtime_error("Malformed OR condition");
+            }
+            auto left = indexed_condition_candidates(table, schema, column_indexes, *condition.left);
+            auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
+            if (left && right) {
+                return union_row_ids(std::move(*left), std::move(*right));
+            }
+            return std::nullopt;
+        }
+
+        case ConditionKind::Like:
+            return std::nullopt;
+    }
+
+    throw std::runtime_error("Unknown condition kind");
+}
+
+std::vector<RowID> candidate_row_ids(
+    const Table &table,
+    const Schema &schema,
+    const std::unordered_map<std::string, int> &column_indexes,
+    const std::optional<Condition> &where) {
+    if (!where) {
+        return all_active_row_ids(table);
+    }
+
+    auto candidates = indexed_condition_candidates(table, schema, column_indexes, *where);
+    return candidates ? normalize_active_row_ids(table, std::move(*candidates)) : all_active_row_ids(table);
+}
+
+// endregion
+
 } // namespace
 
-// region Lifecycle
+// region Executor Lifecycle
 
 Executor::Executor(DBMS &dbms) : dbms_(dbms) {
 }
 
 // endregion
 
-// region Core
+// region Statement Dispatch
 
 std::string Executor::execute(const Statement &stmt) {
     return std::visit(
@@ -291,7 +546,7 @@ std::string Executor::execute(const Statement &stmt) {
 
 // endregion
 
-// region Utilities
+// region Resolution Helpers
 
 Database &Executor::resolve_db(const std::string &db_name) {
     if (!db_name.empty()) {
@@ -311,7 +566,7 @@ Table &Executor::resolve_table(const std::string &db_name, const std::string &ta
 
 // endregion
 
-// region Database Operations
+// region Database Statement Executors
 
 std::string Executor::exec_create_database(const CreateDatabaseStmt &s) const {
     dbms_.create_database(s.db_name);
@@ -330,7 +585,7 @@ std::string Executor::exec_use(const UseStmt &s) const {
 
 // endregion
 
-// region Table Operations
+// region Table Statement Executors
 
 std::string Executor::exec_create_table(const CreateTableStmt &s) {
     Database &db = resolve_db(s.db_name);
@@ -357,7 +612,7 @@ std::string Executor::exec_drop_table(const DropTableStmt &s) {
 
 // endregion
 
-// region Row Operations
+// region Row Statement Executors
 
 std::string Executor::exec_insert(const InsertStmt &s) {
     Table &table = resolve_table(s.db_name, s.table_name);
@@ -418,10 +673,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
 
     std::vector<std::pair<RowID, Row>> updates;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
@@ -446,10 +698,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
@@ -471,10 +720,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
 
     std::vector<RowID> matching_ids;
     const std::vector<Row> &data = table.data();
-    for (RowID id = 0; id < data.size(); ++id) {
-        if (table.is_deleted(id)) {
-            continue;
-        }
+    for (const RowID id : candidate_row_ids(table, schema, column_indexes, s.where)) {
         if (s.where && !eval_condition(*s.where, data[id], column_indexes)) {
             continue;
         }
@@ -558,7 +804,7 @@ std::string Executor::exec_revert(const RevertStmt &s) {
 
 // endregion
 
-// region Evaluation
+// region Condition And Expression Evaluation
 
 bool Executor::eval_condition(
     const Condition &cond,
@@ -679,7 +925,7 @@ Value Executor::eval_expr(
 
 // endregion
 
-// region Serialization
+// region Result Serialization
 
 std::string Executor::rows_to_json(const std::vector<Row> &rows, const std::vector<std::string> &col_names) {
     nlohmann::json result = nlohmann::json::array();

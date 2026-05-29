@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -45,6 +46,34 @@ public:
      * @return true for rows that have been deleted
      */
     [[nodiscard]] bool is_deleted(RowID id) const;
+
+    /**
+     * @param column_name column name
+     * @return true if the column has an index
+     */
+    [[nodiscard]] bool has_index(const std::string &column_name) const noexcept;
+
+    /**
+     * @param column_name indexed column name
+     * @param value lookup key
+     * @return RowIDs matching value, or an empty vector if the column is not indexed / no match exists
+     */
+    [[nodiscard]] std::vector<RowID> find_indexed(const std::string &column_name, const Value &value) const;
+
+    /**
+     * @param column_name indexed column name
+     * @param lower optional lower bound
+     * @param lower_inclusive whether lower bound is inclusive when present
+     * @param upper optional upper bound
+     * @param upper_inclusive whether upper bound is inclusive when present
+     * @return RowIDs in the requested range, or an empty vector if the column is not indexed / no match exists
+     */
+    [[nodiscard]] std::vector<RowID> range_indexed(
+        const std::string &column_name,
+        const std::optional<Value> &lower,
+        bool lower_inclusive,
+        const std::optional<Value> &upper,
+        bool upper_inclusive) const;
 
     /**
      *
