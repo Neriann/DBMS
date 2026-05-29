@@ -44,7 +44,6 @@ add_executable(query_tests unit/query/tests.cpp)
 target_link_libraries(query_tests PRIVATE dbms_core gtest gtest_main)
 target_include_directories(query_tests PRIVATE ${gtest_SOURCE_DIR}/include)
 
-
 add_executable(task_manager_test
     unit/async/task_manager_test.cpp
 )
@@ -60,6 +59,10 @@ add_executable(api_async_test
 )
 target_link_libraries(api_async_test PRIVATE dbms_core)
 
+add_executable(auth_integration_tests integration/auth/auth_integration_tests.cpp)
+target_include_directories(auth_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(auth_integration_tests PRIVATE dbms_core gtest_main)
+
 # -------------------------
 # TEST DISCOVERY
 # -------------------------
@@ -73,3 +76,4 @@ gtest_discover_tests(page_io_test)
 gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)
+gtest_discover_tests(auth_integration_tests)
