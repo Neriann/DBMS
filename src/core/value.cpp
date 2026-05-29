@@ -1,15 +1,24 @@
 #include "core/value.hpp"
+#include "core/stringpool.hpp"
+#include <variant>
 
-bool ValueComparator::operator()(const Value &a, const Value &b) const {
-    if (a.index() != b.index()) {
-        return a.index() < b.index();
-    }
-    if (std::holds_alternative<int>(a)) {
-        return std::get<int>(a) < std::get<int>(b);
-    }
-    if (std::holds_alternative<std::string>(a)) {
-        return std::get<std::string>(a) < std::get<std::string>(b);
+bool ValueComparator::operator()(const Value& lhs, const Value& rhs) const {
+    if (lhs.index() != rhs.index()) {
+        return lhs.index() < rhs.index();
     }
 
+    if (std::holds_alternative<int>(lhs)) {
+        return std::get<int>(lhs) < std::get<int>(rhs);
+    }
+
+    if (std::holds_alternative<InternedString>(lhs)) {
+        const auto& l = std::get<InternedString>(lhs);
+        const auto& r = std::get<InternedString>(rhs);
+
+        // ключевая идея string interning:
+        return l.id < r.id;
+    }
+
+    // nullptr == nullptr
     return false;
 }

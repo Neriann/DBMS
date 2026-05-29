@@ -1,5 +1,4 @@
 #include "storage/storage_manager.hpp"
-
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -12,8 +11,9 @@ namespace {
         if (std::holds_alternative<int>(value)) {
             return std::get<int>(value);
         }
-        if (std::holds_alternative<std::string>(value)) {
-            return std::get<std::string>(value);
+        if (std::holds_alternative<InternedString>(value)) {
+            const auto &interned = std::get<InternedString>(value);
+            return global_string_pool().get(interned.id);
         }
         return nullptr;
     }
@@ -22,11 +22,14 @@ namespace {
         if (j.is_null()) {
             return nullptr;
         }
+
         if (type == ColumnType::INT) {
             return j.get<int>();
         }
+
         if (type == ColumnType::STRING) {
-            return j.get<std::string>();
+            const std::string &str = j.get<std::string>();
+            return InternedString{global_string_pool().intern(str)};
         }
 
         throw std::runtime_error("Corrupted schema: unknown column type");
@@ -78,11 +81,26 @@ namespace { // visible only here
         if (std::holds_alternative<int>(v)) {
             const auto val = std::get<int>(v);
             out.write(reinterpret_cast<const char *>(&val), sizeof(val));
-        } else if (std::holds_alternative<std::string>(v)) {
-            const auto &val = std::get<std::string>(v);
-            const std::size_t len = val.size();
-            out.write(reinterpret_cast<const char *>(&len), sizeof(len));
-            out.write(val.data(), static_cast<std::streamsize>(len));
+        }
+        else if (std::holds_alternative<InternedString>(v)) {
+            const InternedString& interned =
+                std::get<InternedString>(v);
+
+            const std::string& str =
+                global_string_pool().get(interned.id);
+
+            const std::size_t len = str.size();
+
+            // ВОТ ЭТОГО НЕ ХВАТАЛО
+            out.write(
+                reinterpret_cast<const char*>(&len),
+                sizeof(len)
+            );
+
+            out.write(
+                str.data(),
+                static_cast<std::streamsize>(len)
+            );
         }
     }
 
@@ -100,7 +118,7 @@ namespace { // visible only here
             read_safe(in, reinterpret_cast<char *>(&len), sizeof(len));
             std::string val(len, '\0');
             read_safe(in, val.data(), static_cast<std::streamsize>(len));
-            return val;
+            return InternedString{global_string_pool().intern(val)};
         }
         if (type_idx == 2) {
             return nullptr;
