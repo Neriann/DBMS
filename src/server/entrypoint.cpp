@@ -1,7 +1,9 @@
 #include "crow.h"
 
 #include <arpa/inet.h>
+
 #include <cerrno>
+
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -12,9 +14,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <vector>
+
 #include <thread>
 #include <atomic>
 #include <chrono>
+
+#include <mutex>
+
 
 namespace {
 
@@ -217,11 +223,13 @@ void restart_node(const StorageNode& node) {
 }
 
 void heartbeat_loop(std::vector<StorageNode>* nodes,
-                    std::atomic<bool>* running)
+    std::mutex* mtx,                
+    std::atomic<bool>* running)
 {
     using namespace std::chrono_literals;
 
     while (running->load()) {
+        std::lock_guard lock(*mtx);
         for (auto& node : *nodes) {
             const bool was_alive = node.alive;
             const bool is_alive = ping_node(node);
@@ -284,17 +292,26 @@ int main() {
             "9001"
         }
     };
-    
+    std::mutex nodes_mtx;
+
     CROW_ROUTE(app, "/query")
     .methods(crow::HTTPMethod::Post)
-    ([&nodes](const crow::request& req) {
+    ([&nodes, &nodes_mtx](const crow::request& req) {
 
-        if (nodes.empty()) {
+        std::vector<StorageNode> snapshot;
+
+        {
+            std::lock_guard lock(nodes_mtx);
+            snapshot = nodes;
+        }
+
+        if (snapshot.empty()) {
             return crow::response(500, "no storage nodes available");
         }
 
         try {
-            auto response = send_with_failover(nodes, req.body);
+            auto response = send_with_failover(snapshot, req.body);
+
             return crow::response(
                 200,
                 extract_body(response)
@@ -309,6 +326,7 @@ int main() {
     std::thread hb_thread(
         heartbeat_loop,
         &nodes,
+        &nodes_mtx,
         &running
     );
     hb_thread.detach();
