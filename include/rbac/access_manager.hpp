@@ -1,6 +1,7 @@
 #pragma once
 
 #include "auth/session_context.hpp"
+#include "rbac/access_control_storage.hpp"
 #include "rbac/permission.hpp"
 #include "rbac/permission_resolver.hpp"
 
@@ -10,7 +11,7 @@ namespace rbac {
 
 class AccessManager {
 public:
-    explicit AccessManager(PermissionResolver &resolver);
+    AccessManager(PermissionResolver &resolver, AccessControlStorage &storage);
 
     [[nodiscard]] bool allow(const auth::SessionContext &ctx,
                              const std::string &database_name,
@@ -19,6 +20,7 @@ public:
 
 private:
     PermissionResolver &resolver_;
+    AccessControlStorage &storage_;
 };
 
 } // namespace rbac

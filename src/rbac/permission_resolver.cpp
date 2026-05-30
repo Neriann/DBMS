@@ -9,9 +9,13 @@ bool matches_scope(const Policy &policy,
                    const std::string &database_name,
                    const std::string &table_name,
                    Permission permission) {
+    const auto matches_name = [](const std::string &policy_value, const std::string &requested_value) {
+        return policy_value == "*" || policy_value == requested_value;
+    };
+
     return policy.permission == permission
-        && policy.database_name == database_name
-        && policy.table_name == table_name;
+        && matches_name(policy.database_name, database_name)
+        && matches_name(policy.table_name, table_name);
 }
 
 } // namespace

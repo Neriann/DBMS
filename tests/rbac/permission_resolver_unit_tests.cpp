@@ -98,6 +98,36 @@ TEST(RbacIntegration, PolicyDoesNotApplyToOtherTables) {
     EXPECT_FALSE(allowed);
 }
 
+TEST(RbacIntegration, WildcardDefaultReadAppliesToAnyTable) {
+    rbac::PermissionResolver resolver;
+
+    auth::SessionContext ctx;
+    ctx.user_id = "u1";
+    ctx.username = "alice";
+
+    const std::vector<rbac::Policy> policies = {
+        make_policy(rbac::SubjectType::Default, "", "*", "*", rbac::Permission::ReadTable, true)};
+
+    EXPECT_TRUE(resolver.resolve(ctx, policies, {}, "db1", "users", rbac::Permission::ReadTable));
+    EXPECT_TRUE(resolver.resolve(ctx, policies, {}, "db2", "reports", rbac::Permission::ReadTable));
+    EXPECT_FALSE(resolver.resolve(ctx, policies, {}, "db1", "users", rbac::Permission::WriteTable));
+}
+
+TEST(RbacIntegration, UserSpecificDenyOverridesWildcardDefaultRead) {
+    rbac::PermissionResolver resolver;
+
+    auth::SessionContext ctx;
+    ctx.user_id = "u1";
+    ctx.username = "alice";
+
+    const std::vector<rbac::Policy> policies = {
+        make_policy(rbac::SubjectType::Default, "", "*", "*", rbac::Permission::ReadTable, true),
+        make_policy(rbac::SubjectType::User, "u1", "db1", "users", rbac::Permission::ReadTable, false)};
+
+    EXPECT_FALSE(resolver.resolve(ctx, policies, {}, "db1", "users", rbac::Permission::ReadTable));
+    EXPECT_TRUE(resolver.resolve(ctx, policies, {}, "db1", "orders", rbac::Permission::ReadTable));
+}
+
 TEST(RbacIntegration, AdminBypassesChecks) {
     rbac::PermissionResolver resolver;
 
