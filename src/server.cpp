@@ -119,6 +119,10 @@ int main(const int argc, char **argv) {
     server::register_query_routes(app, exec, storage, dbms, mtx, access_manager);
     server::register_metrics_routes(app, telemetry);
 
+    CROW_ROUTE(app, "/heartbeat").methods(crow::HTTPMethod::Get)([] {
+        return crow::response(200, "OK");
+    });
+
     std::cout << "dbms_server listening on port " << port
             << ", data dir: " << data_dir
             << ", access log: " << access_log_path << "\n";
