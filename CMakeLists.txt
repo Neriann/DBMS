@@ -121,6 +121,7 @@ add_executable(dbms_server
         src/server/routes/auth_routes.cpp
         src/server/routes/admin_routes.cpp
         src/server/routes/query_routes.cpp
+        src/server/routes/async_routes.cpp
         src/server/routes/metrics_routes.cpp
         src/server/middleware/auth_middleware.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
@@ -129,6 +130,8 @@ target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 add_executable(entrypointer
     src/entrypoint_main.cpp
     src/server/entrypoint.cpp
+    src/server/cluster_heartbeat_service.cpp
+    src/server/routes/entrypoint_routes.cpp
 )
 target_link_libraries(entrypointer PRIVATE dbms_core Crow::Crow)
 

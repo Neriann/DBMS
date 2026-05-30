@@ -93,6 +93,20 @@ add_executable(rbac_http_integration_tests
 target_include_directories(rbac_http_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(rbac_http_integration_tests PRIVATE dbms_core Crow::Crow gtest_main)
 
+add_executable(application_demo_integration_tests
+        integration/server/application_demo_integration_tests.cpp
+        ../src/server/cluster_heartbeat_service.cpp
+        ../src/server/middleware/access_logger.cpp
+        ../src/server/middleware/telemetry.cpp
+        ../src/server/middleware/auth_middleware.cpp
+        ../src/server/routes/auth_routes.cpp
+        ../src/server/routes/admin_routes.cpp
+        ../src/server/routes/query_routes.cpp
+        ../src/server/routes/async_routes.cpp
+        ../src/server/routes/entrypoint_routes.cpp)
+target_include_directories(application_demo_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(application_demo_integration_tests PRIVATE dbms_core Crow::Crow gtest_main)
+
 include(GoogleTest)
 gtest_discover_tests(storage_unit_test)
 gtest_discover_tests(binary_io_test)
@@ -111,3 +125,4 @@ gtest_discover_tests(permission_resolver_unit_tests)
 gtest_discover_tests(access_manager_service_tests)
 gtest_discover_tests(auth_middleware_integration_tests)
 gtest_discover_tests(rbac_http_integration_tests)
+gtest_discover_tests(application_demo_integration_tests)
