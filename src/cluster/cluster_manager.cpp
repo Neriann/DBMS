@@ -1,46 +1,65 @@
 #include "cluster/cluster_manager.hpp"
 
-#include "common/not_implemented.hpp"
+#include <functional>
+#include <stdexcept>
+#include <string>
 
 namespace cluster {
 
 ClusterManager::ClusterManager(ClusterStateStorage &storage)
     : storage_(storage), topology_(ClusterConfig{}) {
+    refresh();
 }
 
 void ClusterManager::refresh() {
-    common::not_implemented();
+    const auto config = storage_.load_config();
+    topology_ = Topology(config);
+    for (const auto &node : storage_.load_nodes()) {
+        topology_.upsert_node(node);
+    }
+    shard_registry_ = storage_.load_shard_registry();
+    ring_.rebuild(topology_.nodes(), virtual_nodes_);
 }
 
 void ClusterManager::add_node(const NodeInfo &node) {
-    common::not_implemented(node);
+    topology_.upsert_node(node);
+    storage_.save_nodes(topology_.nodes());
+    ring_.rebuild(topology_.nodes(), virtual_nodes_);
 }
 
 void ClusterManager::remove_node(const NodeId &node_id) {
-    common::not_implemented(node_id);
+    topology_.remove_node(node_id);
+    storage_.save_nodes(topology_.nodes());
+    ring_.rebuild(topology_.nodes(), virtual_nodes_);
 }
 
 ShardId ClusterManager::compute_shard_id(const ShardKey &key) const {
-    common::not_implemented(key);
-    return 0;
+    const auto shard_count = topology_.config().shard_count;
+    if (shard_count == 0) {
+        throw std::runtime_error("cluster shard_count must be greater than zero");
+    }
+    return static_cast<ShardId>(std::hash<std::string>{}(key) % shard_count);
 }
 
 NodeId ClusterManager::resolve_owner(const DatabaseName &database,
                                      const TableName &table,
                                      const ShardId shard_id) const {
-    common::not_implemented(database, table, shard_id);
-    return {};
+    if (const auto owner = shard_registry_.owner_of(database, table, shard_id); !owner.empty()) {
+        return owner;
+    }
+    return ring_.locate(shard_id);
 }
 
 const Topology &ClusterManager::topology() const {
-    common::not_implemented();
     return topology_;
 }
 
 const ShardRegistry &ClusterManager::shard_registry() const {
-    common::not_implemented();
     return shard_registry_;
 }
 
-} // namespace cluster
+const NodeInfo *ClusterManager::find_node(const NodeId &node_id) const {
+    return topology_.find_node(node_id);
+}
 
+} // namespace cluster

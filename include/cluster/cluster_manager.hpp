@@ -27,6 +27,7 @@ public:
 
     [[nodiscard]] const Topology &topology() const;
     [[nodiscard]] const ShardRegistry &shard_registry() const;
+    [[nodiscard]] const NodeInfo *find_node(const NodeId &node_id) const;
 
 private:
     ClusterStateStorage &storage_;
