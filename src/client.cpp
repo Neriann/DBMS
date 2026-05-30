@@ -23,7 +23,13 @@ namespace {
         CreateGroup,
         AddUserToGroup,
         GrantPermission,
-        RevokePermission
+        RevokePermission,
+        NodeList,
+        NodeAdd,
+        NodeRemove,
+        Heartbeat,
+        AsyncQuery,
+        TaskStatus
     };
 
     class Socket {
@@ -276,6 +282,42 @@ namespace {
         return recv_all(socket.fd());
     }
 
+    std::string http_get(const std::string &host,
+                         const std::string &port,
+                         const std::string &path,
+                         const std::string &token) {
+        const auto socket = connect_to_server(host, port);
+
+        std::ostringstream request;
+        request << "GET " << path << " HTTP/1.1\r\n"
+                << "Host: " << host << ':' << port << "\r\n";
+        if (!token.empty()) {
+            request << "Authorization: Bearer " << token << "\r\n";
+        }
+        request << "Connection: close\r\n\r\n";
+
+        send_all(socket.fd(), request.str());
+        return recv_all(socket.fd());
+    }
+
+    std::string http_delete(const std::string &host,
+                            const std::string &port,
+                            const std::string &path,
+                            const std::string &token) {
+        const auto socket = connect_to_server(host, port);
+
+        std::ostringstream request;
+        request << "DELETE " << path << " HTTP/1.1\r\n"
+                << "Host: " << host << ':' << port << "\r\n";
+        if (!token.empty()) {
+            request << "Authorization: Bearer " << token << "\r\n";
+        }
+        request << "Connection: close\r\n\r\n";
+
+        send_all(socket.fd(), request.str());
+        return recv_all(socket.fd());
+    }
+
     int parse_status_code(const std::string &response) {
         std::istringstream line(response.substr(0, response.find("\r\n")));
         std::string http_version;
@@ -292,6 +334,17 @@ namespace {
         return response.substr(header_end + 4);
     }
 
+    int print_response(const std::string &response) {
+        const auto status = parse_status_code(response);
+        const auto body = response_body(response);
+        auto &out = status >= 200 && status < 300 ? std::cout : std::cerr;
+        if (!body.empty()) {
+            out << body;
+            if (body.back() != '\n') out << '\n';
+        }
+        return status >= 200 && status < 300 ? 0 : 1;
+    }
+
     void print_usage(const char *program) {
         std::cerr
                 << "usage:\n"
@@ -302,6 +355,12 @@ namespace {
                 << "  " << program << " --add-user-to-group USER_ID GROUP_ID [--token TOKEN|--token-file PATH]\n"
                 << "  " << program << " --grant-permission SUBJECT_TYPE SUBJECT_ID DB TABLE PERMISSION [--token TOKEN|--token-file PATH]\n"
                 << "  " << program << " --revoke-permission SUBJECT_TYPE SUBJECT_ID DB TABLE PERMISSION [--token TOKEN|--token-file PATH]\n"
+                << "  " << program << " --node-list [--host HOST] [--port PORT]\n"
+                << "  " << program << " --node-add ID HOST PORT [--host ENTRYPOINT_HOST] [--port ENTRYPOINT_PORT]\n"
+                << "  " << program << " --node-remove ID [--host HOST] [--port PORT]\n"
+                << "  " << program << " --heartbeat [--host HOST] [--port PORT]\n"
+                << "  " << program << " --async-query [file.sql] [--token TOKEN|--token-file PATH]\n"
+                << "  " << program << " --task TASK_ID [--token TOKEN|--token-file PATH]\n"
                 << "\n"
                 << "SQL is read from stdin when file.sql is omitted.\n";
     }
@@ -324,6 +383,10 @@ int main(const int argc, char **argv) {
     std::string database_name;
     std::string table_name;
     std::string permission;
+    std::string node_id;
+    std::string node_host;
+    std::string node_port;
+    std::string task_id;
     const char *file_path = nullptr;
 
     for (int i = 1; i < argc; ++i) {
@@ -405,6 +468,47 @@ int main(const int argc, char **argv) {
             database_name = argv[++i];
             table_name = argv[++i];
             permission = argv[++i];
+        } else if (arg == "--node-list") {
+            if (mode != Mode::Query) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::NodeList;
+        } else if (arg == "--node-add") {
+            if (mode != Mode::Query || i + 3 >= argc) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::NodeAdd;
+            node_id = argv[++i];
+            node_host = argv[++i];
+            node_port = argv[++i];
+        } else if (arg == "--node-remove") {
+            if (mode != Mode::Query || i + 1 >= argc) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::NodeRemove;
+            node_id = argv[++i];
+        } else if (arg == "--heartbeat") {
+            if (mode != Mode::Query) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::Heartbeat;
+        } else if (arg == "--async-query") {
+            if (mode != Mode::Query) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::AsyncQuery;
+        } else if (arg == "--task") {
+            if (mode != Mode::Query || i + 1 >= argc) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            mode = Mode::TaskStatus;
+            task_id = argv[++i];
         } else if (arg == "-h" || arg == "--help") {
             print_usage(argv[0]);
             return 0;
@@ -436,6 +540,25 @@ int main(const int argc, char **argv) {
             write_token_file(token_file, token);
             std::cout << "token saved to " << token_file << '\n';
             return 0;
+        }
+
+        if (mode == Mode::NodeList) {
+            return print_response(http_get(host, port, "/nodes", ""));
+        }
+
+        if (mode == Mode::NodeAdd) {
+            const auto body = std::string{"{\"id\":\""} + json_escape(node_id)
+                + "\",\"host\":\"" + json_escape(node_host)
+                + "\",\"port\":" + node_port + "}";
+            return print_response(http_post(host, port, "/nodes", "application/json", body, ""));
+        }
+
+        if (mode == Mode::NodeRemove) {
+            return print_response(http_delete(host, port, "/nodes/" + node_id, ""));
+        }
+
+        if (mode == Mode::Heartbeat) {
+            return print_response(http_get(host, port, "/heartbeat", ""));
         }
 
         if (!token_explicit) {
@@ -488,8 +611,16 @@ int main(const int argc, char **argv) {
             return status >= 200 && status < 300 ? 0 : 1;
         }
 
+        if (mode == Mode::TaskStatus) {
+            return print_response(http_get(host, port, "/task/" + task_id, token));
+        }
+
         const auto sql = file_path == nullptr ? read_all(std::cin) : read_file(file_path);
         if (sql.empty()) return 0;
+
+        if (mode == Mode::AsyncQuery) {
+            return print_response(http_post(host, port, "/async/query", "text/plain; charset=utf-8", sql, token));
+        }
 
         const auto response = http_post(host, port, "/query", "text/plain; charset=utf-8", sql, token);
         const auto status = parse_status_code(response);

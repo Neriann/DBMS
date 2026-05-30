@@ -1,5 +1,5 @@
 #include "server/entrypoint.hpp"
 
-int main() {
-    return run_entrypoint();
+int main(int argc, char **argv) {
+    return run_entrypoint(argc, argv);
 }

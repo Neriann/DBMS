@@ -43,7 +43,6 @@ Important files:
 ./data/groups.tbl
 ./data/user_groups.tbl
 ./data/permissions.tbl
-./data/roles.tbl
 ./data/jwt_secret
 ./data/access.log
 ```
@@ -60,12 +59,15 @@ Public endpoints:
 POST /register
 POST /login
 GET  /metrics
+GET  /heartbeat
 ```
 
 Protected endpoints:
 
 ```text
 POST /query
+POST /async/query
+GET  /task/{task_id}
 POST /admin/groups
 POST /admin/groups/{group_id}/users
 POST /admin/permissions/grant
@@ -155,6 +157,38 @@ For database-level permissions, pass an empty table name:
 
 ```bash
 ./build/dbms_client --grant-permission user "$ROOT_ID" app "" create_database
+```
+
+Submit an asynchronous query:
+
+```bash
+printf 'CREATE DATABASE demo;' | ./build/dbms_client --async-query
+```
+
+The response contains a task id:
+
+```json
+{"task_id":"..."}
+```
+
+Check task status:
+
+```bash
+./build/dbms_client --task "$TASK_ID"
+```
+
+Check server heartbeat:
+
+```bash
+./build/dbms_client --heartbeat
+```
+
+When using an Entrypoint process, manage storage nodes through the same client:
+
+```bash
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-add node1 127.0.0.1 9001
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-list
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-remove node1
 ```
 
 ## Raw HTTP: Register
@@ -323,6 +357,54 @@ curl -s -X POST http://127.0.0.1:8080/query \
   --data-binary 'SELECT * FROM app.users;'
 ```
 
+## Raw HTTP: Async SQL
+
+The `/async/query` endpoint accepts the same raw SQL text as `/query`, checks the
+same JWT and RBAC permissions, and returns immediately with a task id.
+
+```bash
+TASK_ID=$(curl -s -X POST http://127.0.0.1:8080/async/query \
+  -H "Authorization: Bearer $ROOT_TOKEN" \
+  -H 'Content-Type: text/plain' \
+  --data-binary 'CREATE DATABASE async_demo;' | jq -r .task_id)
+```
+
+Task status is available through `/task/{task_id}`:
+
+```bash
+curl -s http://127.0.0.1:8080/task/$TASK_ID \
+  -H "Authorization: Bearer $ROOT_TOKEN"
+```
+
+Example completed response:
+
+```json
+{"task_id":"...","status":"done","result":"{\"message\":\"Database 'async_demo' created\",\"status\":\"ok\"}"}
+```
+
+## Entrypoint And Storage Nodes
+
+`entrypointer` runs the cluster entrypoint. Storage nodes are regular
+`dbms_server` processes:
+
+```bash
+./build/dbms_server 9001 ./data/node1
+./build/dbms_server 9002 ./data/node2
+./build/entrypointer 8080 ./data/entrypoint
+```
+
+Register storage nodes without raw HTTP:
+
+```bash
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-add node1 127.0.0.1 9001
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-add node2 127.0.0.1 9002
+./build/dbms_client --host 127.0.0.1 --port 8080 --node-list
+```
+
+The entrypoint periodically calls each storage node's public `/heartbeat`
+endpoint. If a storage node stops responding, the entrypoint removes it from
+topology and triggers shard rebalance.
+
 ## Smoke Tests
 
 Missing token returns `401 Unauthorized`:
@@ -350,6 +432,27 @@ Metrics are public:
 
 ```bash
 curl -s http://127.0.0.1:8080/metrics
+```
+
+Heartbeat is public:
+
+```bash
+curl -s http://127.0.0.1:8080/heartbeat
+```
+
+## Integration Tests
+
+The server demo flows are covered by:
+
+```bash
+ctest --test-dir build -R ApplicationDemoIntegration --output-on-failure
+```
+
+These tests start real Crow applications in-process and cover:
+
+```text
+JWT + RBAC + /async/query + /task/{task_id} + file storage
+entrypoint /nodes + storage /heartbeat + automatic dead-node removal
 ```
 
 ## Notes

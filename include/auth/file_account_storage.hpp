@@ -29,7 +29,6 @@ private:
     [[nodiscard]] std::filesystem::path groups_path() const;
     [[nodiscard]] std::filesystem::path user_groups_path() const;
     [[nodiscard]] std::filesystem::path permissions_path() const;
-    [[nodiscard]] std::filesystem::path roles_path() const;
 
     std::filesystem::path data_dir_;
 };

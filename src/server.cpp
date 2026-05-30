@@ -15,6 +15,7 @@
 #include "server/middleware/access_logger.hpp"
 #include "server/middleware/telemetry.hpp"
 #include "services/admin_service.hpp"
+#include "server/routes/async_routes.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
 #include <cstdlib>
@@ -102,6 +103,7 @@ int main(const int argc, char **argv) {
     storage.load(dbms);
     Executor exec(dbms);
     std::mutex mtx;
+    auto task_manager = server::make_task_manager(exec, storage, dbms, mtx);
     const auto access_log_path = std::filesystem::path(data_dir) / "access.log";
     std::shared_ptr<AccessLogger> access_logger;
     try {
@@ -118,6 +120,11 @@ int main(const int argc, char **argv) {
     server::register_admin_routes(app, admin_service, access_manager);
     server::register_query_routes(app, exec, storage, dbms, mtx, access_manager);
     server::register_metrics_routes(app, telemetry);
+
+    CROW_ROUTE(app, "/heartbeat").methods(crow::HTTPMethod::Get)([] {
+        return crow::response(200, "OK");
+    });
+    server::register_async_routes(app, task_manager, access_manager);
 
     std::cout << "dbms_server listening on port " << port
             << ", data dir: " << data_dir

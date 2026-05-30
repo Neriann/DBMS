@@ -68,6 +68,20 @@ set(CORE_SOURCES
         src/auth/password_hasher.cpp
         src/rbac/access_manager.cpp
         src/rbac/permission_resolver.cpp
+        src/cluster/cluster_state_storage.cpp
+        src/cluster/cluster_manager.cpp
+        src/cluster/hash_ring.cpp
+        src/cluster/heartbeat_monitor.cpp
+        src/cluster/rebalance_manager.cpp
+        src/cluster/shard_registry.cpp
+        src/cluster/topology.cpp
+        src/distributed/execution/distributed_executor.cpp
+        src/distributed/execution/result_merger.cpp
+        src/distributed/execution/scatter_gather.cpp
+        src/distributed/routing/query_router.cpp
+        src/distributed/routing/shard_resolver.cpp
+        src/distributed/rpc/rpc_client.cpp
+        src/distributed/rpc/rpc_server.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )
@@ -107,6 +121,7 @@ add_executable(dbms_server
         src/server/routes/auth_routes.cpp
         src/server/routes/admin_routes.cpp
         src/server/routes/query_routes.cpp
+        src/server/routes/async_routes.cpp
         src/server/routes/metrics_routes.cpp
         src/server/middleware/auth_middleware.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
@@ -115,7 +130,8 @@ target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 add_executable(entrypointer
     src/entrypoint_main.cpp
     src/server/entrypoint.cpp
-    src/server/heartbeat.cpp
+    src/server/cluster_heartbeat_service.cpp
+    src/server/routes/entrypoint_routes.cpp
 )
 target_link_libraries(entrypointer PRIVATE dbms_core Crow::Crow)
 
