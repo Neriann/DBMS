@@ -3,6 +3,7 @@
 #include "cluster/types.hpp"
 
 #include <chrono>
+#include <map>
 #include <vector>
 
 namespace cluster {
@@ -15,7 +16,9 @@ public:
 
     [[nodiscard]] std::vector<NodeId> expired(clock::time_point now,
                                               std::chrono::milliseconds timeout) const;
+
+private:
+    std::map<NodeId, clock::time_point> seen_;
 };
 
 } // namespace cluster
-
