@@ -5,11 +5,14 @@
 #include "distributed/execution/distributed_executor.hpp"
 #include "distributed/execution/result_merger.hpp"
 #include "distributed/execution/scatter_gather.hpp"
+#include "distributed/rpc/rpc_client.hpp"
 #include "distributed/routing/query_router.hpp"
 #include "distributed/routing/shard_resolver.hpp"
 #include "query/query_runner.hpp"
 
+#include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
@@ -19,6 +22,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <variant>
 
 namespace {
@@ -169,6 +173,36 @@ int run_entrypoint(const int argc, char **argv) {
     distributed::execution::DistributedExecutor executor(router, scatter_gather, merger);
 
     std::mutex cluster_mtx;
+    std::atomic_bool running{true};
+    std::thread heartbeat_thread([&] {
+        constexpr auto interval = std::chrono::seconds(2);
+        while (running.load()) {
+            std::this_thread::sleep_for(interval);
+
+            std::vector<cluster::NodeInfo> nodes;
+            {
+                std::lock_guard lock(cluster_mtx);
+                nodes = cluster_manager.topology().nodes();
+            }
+
+            for (const auto &node : nodes) {
+                try {
+                    distributed::rpc::RpcClient client(node.endpoint);
+                    const auto response = client.heartbeat(node.id);
+                    if (response.status == 200) {
+                        continue;
+                    }
+                } catch (const std::exception &) {
+                }
+
+                std::lock_guard lock(cluster_mtx);
+                if (cluster_manager.find_node(node.id) != nullptr) {
+                    cluster_manager.remove_node(node.id);
+                    std::cerr << "storage node expired: " << node.id << "\n";
+                }
+            }
+        }
+    });
     crow::SimpleApp app;
 
     CROW_ROUTE(app, "/nodes").methods(crow::HTTPMethod::Get)([&cluster_manager, &cluster_mtx] {
@@ -226,5 +260,9 @@ int run_entrypoint(const int argc, char **argv) {
 
     std::cout << "entrypoint listening on port " << port << ", data dir: " << data_dir << "\n";
     app.port(port).multithreaded().run();
+    running = false;
+    if (heartbeat_thread.joinable()) {
+        heartbeat_thread.join();
+    }
     return 0;
 }
