@@ -4,6 +4,8 @@
 #include "cluster/types.hpp"
 
 #include <cstddef>
+#include <cstdint>
+#include <utility>
 #include <vector>
 
 namespace cluster {
@@ -15,7 +17,7 @@ public:
     [[nodiscard]] NodeId locate(ShardId shard_id) const;
 
 private:
-    std::vector<NodeId> ring_;
+    std::vector<std::pair<std::uint64_t, NodeId>> ring_;
 };
 
 } // namespace cluster
