@@ -45,6 +45,11 @@ add_executable(task_manager_test
 )
 target_link_libraries(task_manager_test PRIVATE dbms_core gtest_main)
 
+add_executable(cluster_manager_test
+    unit/cluster/cluster_manager_test.cpp
+)
+target_link_libraries(cluster_manager_test PRIVATE dbms_core gtest_main)
+
 add_executable(api_async_test
     integration/async/api_async_test.cpp
 )
@@ -92,6 +97,8 @@ gtest_discover_tests(page_io_test)
 gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)
+gtest_discover_tests(task_manager_test)
+gtest_discover_tests(cluster_manager_test)
 gtest_discover_tests(auth_integration_tests)
 gtest_discover_tests(file_account_storage_tests)
 gtest_discover_tests(permission_resolver_unit_tests)
