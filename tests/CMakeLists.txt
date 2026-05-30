@@ -7,10 +7,6 @@ FetchContent_Declare(
         GIT_TAG v1.17.0
 )
 
-# -------------------------
-# UNIT TESTS (у тебя уже есть)
-# -------------------------
-
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -49,11 +45,6 @@ add_executable(task_manager_test
 )
 target_link_libraries(task_manager_test PRIVATE dbms_core gtest_main)
 
-# -------------------------
-# ASYNC TESTS
-# -------------------------
-
-
 add_executable(api_async_test
     integration/async/api_async_test.cpp
 )
@@ -91,10 +82,6 @@ add_executable(rbac_http_integration_tests
         ../src/server/routes/query_routes.cpp)
 target_include_directories(rbac_http_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(rbac_http_integration_tests PRIVATE dbms_core Crow::Crow gtest_main)
-
-# -------------------------
-# TEST DISCOVERY
-# -------------------------
 
 include(GoogleTest)
 gtest_discover_tests(storage_unit_test)
