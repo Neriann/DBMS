@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <gtest/gtest.h>
+#include <regex>
 #include <stdexcept>
 
 namespace {
@@ -56,6 +57,26 @@ TEST(AuthServiceIntegration, RegisterRejectsDuplicateUser) {
         const auto duplicate = auth_service.register_user("alice", "secret");
         (void)duplicate;
     }, std::runtime_error);
+}
+
+TEST(AuthServiceIntegration, RegisterMakesOnlyFirstUserAdmin) {
+    tests::InMemoryAccountStorage storage;
+    auth::JwtService jwt("alabuga");
+    auth::PasswordHasher hasher;
+    auth::AuthService auth_service(storage, jwt, hasher);
+
+    const auto first_token = auth_service.register_user("root", "secret");
+    const auto second_token = auth_service.register_user("alice", "secret");
+
+    EXPECT_FALSE(first_token.empty());
+    EXPECT_FALSE(second_token.empty());
+
+    const auto root = storage.find_by_username("root");
+    const auto alice = storage.find_by_username("alice");
+    ASSERT_TRUE(root.has_value());
+    ASSERT_TRUE(alice.has_value());
+    EXPECT_TRUE(root->is_admin);
+    EXPECT_FALSE(alice->is_admin);
 }
 
 TEST(AuthServiceIntegration, LoginSuccessReturnsToken) {
@@ -173,4 +194,18 @@ TEST(JwtServiceIntegration, RejectsMalformedToken) {
         const auto parsed = jwt.parse("this.is.not.jwt");
         (void)parsed;
     }, std::runtime_error);
+}
+
+TEST(PasswordHasher, GeneratesOpenSslBackedSaltAndPbkdf2Hash) {
+    auth::PasswordHasher hasher;
+
+    const auto salt = hasher.generate_salt();
+    const auto hash = hasher.hash_password("secret", salt);
+
+    EXPECT_EQ(salt.size(), 32U);
+    EXPECT_EQ(hash.size(), 64U);
+    EXPECT_TRUE(std::regex_match(salt, std::regex("[0-9a-f]{32}")));
+    EXPECT_TRUE(std::regex_match(hash, std::regex("[0-9a-f]{64}")));
+    EXPECT_TRUE(hasher.verify_password("secret", salt, hash));
+    EXPECT_FALSE(hasher.verify_password("wrong", salt, hash));
 }

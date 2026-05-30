@@ -39,7 +39,7 @@ std::string AuthService::login(const std::string &username, const std::string &p
     payload.user_id = user->id;
     payload.username = user->username;
     payload.issued_at = now_seconds();
-    payload.expiration = payload.issued_at + 3600;
+    payload.expiration = payload.issued_at + 3600; // 1 hour expiration
 
     return jwt_.issue_token(payload);
 }
@@ -49,12 +49,14 @@ std::string AuthService::register_user(const std::string &username, const std::s
         throw std::runtime_error("user already exists");
     }
 
+    const bool first_user = !storage_.has_users();
+
     User user;
     user.id = generate_user_id();
     user.username = username;
     user.salt = hasher_.generate_salt();
     user.password_hash = hasher_.hash_password(password, user.salt);
-    user.is_admin = false;
+    user.is_admin = first_user;
 
     storage_.save_user(user);
 

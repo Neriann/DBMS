@@ -26,6 +26,10 @@ public:
         return it->second;
     }
 
+    [[nodiscard]] bool has_users() const override {
+        return !by_id_.empty();
+    }
+
     void save_user(const auth::User &user) override {
         by_username_[user.username] = user;
         by_id_[user.id] = user;
@@ -41,4 +45,3 @@ private:
 };
 
 } // namespace tests
-
