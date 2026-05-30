@@ -4,7 +4,7 @@ namespace server {
 namespace {
 
 bool is_public_route(const std::string &url) {
-    return url == "/login" || url == "/register" || url == "/metrics";
+    return url == "/login" || url == "/register" || url == "/metrics" || url == "/heartbeat";
 }
 
 } // namespace
