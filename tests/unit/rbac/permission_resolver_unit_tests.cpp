@@ -25,7 +25,7 @@ rbac::Policy make_policy(rbac::SubjectType type,
 
 } // namespace
 
-TEST(RbacIntegration, DefaultAllowAppliesWhenNoOverrides) {
+TEST(PermissionResolverUnit, DefaultAllowAppliesWhenNoOverrides) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -39,7 +39,7 @@ TEST(RbacIntegration, DefaultAllowAppliesWhenNoOverrides) {
     EXPECT_TRUE(allowed);
 }
 
-TEST(RbacIntegration, UserDenyOverridesGroupAllow) {
+TEST(PermissionResolverUnit, UserDenyOverridesGroupAllow) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -54,7 +54,7 @@ TEST(RbacIntegration, UserDenyOverridesGroupAllow) {
     EXPECT_FALSE(allowed);
 }
 
-TEST(RbacIntegration, UserAllowOverridesGroupDeny) {
+TEST(PermissionResolverUnit, UserAllowOverridesGroupDeny) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -69,7 +69,7 @@ TEST(RbacIntegration, UserAllowOverridesGroupDeny) {
     EXPECT_TRUE(allowed);
 }
 
-TEST(RbacIntegration, GroupAllowOverridesDefaultDeny) {
+TEST(PermissionResolverUnit, GroupAllowOverridesDefaultDeny) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -84,7 +84,7 @@ TEST(RbacIntegration, GroupAllowOverridesDefaultDeny) {
     EXPECT_TRUE(allowed);
 }
 
-TEST(RbacIntegration, PolicyDoesNotApplyToOtherTables) {
+TEST(PermissionResolverUnit, PolicyDoesNotApplyToOtherTables) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -98,7 +98,7 @@ TEST(RbacIntegration, PolicyDoesNotApplyToOtherTables) {
     EXPECT_FALSE(allowed);
 }
 
-TEST(RbacIntegration, WildcardDefaultReadAppliesToAnyTable) {
+TEST(PermissionResolverUnit, WildcardDefaultReadAppliesToAnyTable) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -113,7 +113,7 @@ TEST(RbacIntegration, WildcardDefaultReadAppliesToAnyTable) {
     EXPECT_FALSE(resolver.resolve(ctx, policies, {}, "db1", "users", rbac::Permission::WriteTable));
 }
 
-TEST(RbacIntegration, UserSpecificDenyOverridesWildcardDefaultRead) {
+TEST(PermissionResolverUnit, UserSpecificDenyOverridesWildcardDefaultRead) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;
@@ -128,7 +128,7 @@ TEST(RbacIntegration, UserSpecificDenyOverridesWildcardDefaultRead) {
     EXPECT_TRUE(resolver.resolve(ctx, policies, {}, "db1", "orders", rbac::Permission::ReadTable));
 }
 
-TEST(RbacIntegration, AdminBypassesChecks) {
+TEST(PermissionResolverUnit, AdminBypassesChecks) {
     rbac::PermissionResolver resolver;
 
     auth::SessionContext ctx;

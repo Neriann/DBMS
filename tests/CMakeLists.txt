@@ -55,7 +55,7 @@ target_link_libraries(task_manager_test PRIVATE dbms_core gtest_main)
 
 
 add_executable(api_async_test
-    integration/api_async_test.cpp
+    integration/async/api_async_test.cpp
 )
 target_link_libraries(api_async_test PRIVATE dbms_core)
 
@@ -63,15 +63,34 @@ add_executable(auth_integration_tests integration/auth/auth_integration_tests.cp
 target_include_directories(auth_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(auth_integration_tests PRIVATE dbms_core gtest_main)
 
-add_executable(rbac_integration_tests rbac/permission_resolver_unit_tests.cpp)
-target_include_directories(rbac_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(rbac_integration_tests PRIVATE dbms_core gtest_main)
+add_executable(file_account_storage_tests integration/auth/file_account_storage_tests.cpp)
+target_include_directories(file_account_storage_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(file_account_storage_tests PRIVATE dbms_core gtest_main)
+
+add_executable(permission_resolver_unit_tests unit/rbac/permission_resolver_unit_tests.cpp)
+target_include_directories(permission_resolver_unit_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(permission_resolver_unit_tests PRIVATE dbms_core gtest_main)
+
+add_executable(access_manager_service_tests unit/rbac/access_manager_service_tests.cpp)
+target_include_directories(access_manager_service_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(access_manager_service_tests PRIVATE dbms_core gtest_main)
 
 add_executable(auth_middleware_integration_tests
         integration/server/auth_middleware_integration_tests.cpp
         ../src/server/middleware/auth_middleware.cpp)
 target_include_directories(auth_middleware_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(auth_middleware_integration_tests PRIVATE dbms_core Crow::Crow gtest_main)
+
+add_executable(rbac_http_integration_tests
+        integration/server/rbac_http_integration_tests.cpp
+        ../src/server/middleware/access_logger.cpp
+        ../src/server/middleware/telemetry.cpp
+        ../src/server/middleware/auth_middleware.cpp
+        ../src/server/routes/auth_routes.cpp
+        ../src/server/routes/admin_routes.cpp
+        ../src/server/routes/query_routes.cpp)
+target_include_directories(rbac_http_integration_tests PRIVATE ../include ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(rbac_http_integration_tests PRIVATE dbms_core Crow::Crow gtest_main)
 
 # -------------------------
 # TEST DISCOVERY
@@ -87,5 +106,8 @@ gtest_discover_tests(b_star_plus_tree_test)
 gtest_discover_tests(access_logger_test)
 gtest_discover_tests(query_tests)
 gtest_discover_tests(auth_integration_tests)
-gtest_discover_tests(rbac_integration_tests)
+gtest_discover_tests(file_account_storage_tests)
+gtest_discover_tests(permission_resolver_unit_tests)
+gtest_discover_tests(access_manager_service_tests)
 gtest_discover_tests(auth_middleware_integration_tests)
+gtest_discover_tests(rbac_http_integration_tests)
