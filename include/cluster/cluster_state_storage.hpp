@@ -21,10 +21,15 @@ public:
 
     [[nodiscard]] ShardRegistry load_shard_registry() const;
     void save_shard_registry(const ShardRegistry &registry) const;
+    void migrate_shard_files(const ShardPlacement &from, const NodeId &to_node) const;
+
+    [[nodiscard]] std::filesystem::path shard_path(const NodeId &node_id,
+                                                   const DatabaseName &database,
+                                                   const TableName &table,
+                                                   ShardId shard_id) const;
 
 private:
     std::filesystem::path data_dir_;
 };
 
 } // namespace cluster
-

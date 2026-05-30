@@ -485,6 +485,6 @@ Requests without an extractable shard key are executed as scatter-gather.
 
 Current implementation limits:
 - `replication_factor = 1`
-- adding/removing nodes rebuilds routing for new requests
-- already persisted shard data is not migrated during rebalancing yet
+- adding/removing nodes rebalances registered shard ownership
+- registered shard directories are moved between local node storage directories during rebalancing
 - multi-row `INSERT` is routed by the first row's `id`

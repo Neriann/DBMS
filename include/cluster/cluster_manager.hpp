@@ -30,6 +30,8 @@ public:
     [[nodiscard]] const NodeInfo *find_node(const NodeId &node_id) const;
 
 private:
+    void rebalance_shards();
+
     ClusterStateStorage &storage_;
     Topology topology_;
     ShardRegistry shard_registry_;

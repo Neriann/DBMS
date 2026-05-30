@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include <sstream>
 #include <stdexcept>
 
 namespace cluster {
@@ -138,18 +137,11 @@ ShardRegistry ClusterStateStorage::load_shard_registry() const {
 
 void ClusterStateStorage::save_shard_registry(const ShardRegistry &registry) const {
     json j = json::array();
-    for (const auto &[key, owner] : registry.ownership()) {
-        std::istringstream parts(key);
-        std::string database;
-        std::string table;
-        std::string shard;
-        std::getline(parts, database, '\t');
-        std::getline(parts, table, '\t');
-        std::getline(parts, shard, '\t');
-        j.push_back({{"database", database},
-                     {"table", table},
-                     {"shard_id", static_cast<ShardId>(std::stoul(shard))},
-                     {"owner_node", owner}});
+    for (const auto &placement : registry.placements()) {
+        j.push_back({{"database", placement.database},
+                     {"table", placement.table},
+                     {"shard_id", placement.shard_id},
+                     {"owner_node", placement.owner_node}});
     }
 
     const auto path = shard_ownership_path(data_dir_);
@@ -159,6 +151,32 @@ void ClusterStateStorage::save_shard_registry(const ShardRegistry &registry) con
         throw std::runtime_error("failed to write shard ownership: " + path.string());
     }
     out << j.dump(2) << '\n';
+}
+
+void ClusterStateStorage::migrate_shard_files(const ShardPlacement &from, const NodeId &to_node) const {
+    if (from.owner_node == to_node) {
+        return;
+    }
+
+    const auto source = shard_path(from.owner_node, from.database, from.table, from.shard_id);
+    if (!std::filesystem::exists(source)) {
+        return;
+    }
+
+    const auto target = shard_path(to_node, from.database, from.table, from.shard_id);
+    std::filesystem::create_directories(target.parent_path());
+    if (std::filesystem::exists(target)) {
+        throw std::runtime_error("cannot migrate shard over existing target: " + target.string());
+    }
+
+    std::filesystem::rename(source, target);
+}
+
+std::filesystem::path ClusterStateStorage::shard_path(const NodeId &node_id,
+                                                      const DatabaseName &database,
+                                                      const TableName &table,
+                                                      const ShardId shard_id) const {
+    return data_dir_ / node_id / "databases" / database / table / ("shard_" + std::to_string(shard_id));
 }
 
 } // namespace cluster

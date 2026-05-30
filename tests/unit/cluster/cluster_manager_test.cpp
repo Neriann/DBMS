@@ -1,7 +1,9 @@
 #include "cluster/cluster_manager.hpp"
+#include "cluster/hash_ring.hpp"
 
 #include <array>
 #include <filesystem>
+#include <fstream>
 #include <gtest/gtest.h>
 #include <map>
 #include <string>
@@ -56,6 +58,76 @@ TEST(ClusterManager, ResolvesShardOwnersAndRebuildsAfterRemoval) {
     manager.remove_node("node1");
     EXPECT_EQ(manager.topology().nodes().size(), 1U);
     EXPECT_EQ(manager.resolve_owner("app", "users", shard), "node2");
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST(ClusterManager, MigratesRegisteredShardFilesWhenOwnerNodeIsRemoved) {
+    const auto dir = temp_cluster_dir("remove_migrates_registered_shard");
+    cluster::ClusterStateStorage storage(dir);
+
+    cluster::ShardRegistry registry;
+    registry.set_owner("app", "users", 7, "node1");
+    storage.save_shard_registry(registry);
+
+    const auto source = storage.shard_path("node1", "app", "users", 7);
+    std::filesystem::create_directories(source);
+    {
+        std::ofstream marker(source / "rows.tbl");
+        marker << "row payload\n";
+    }
+
+    cluster::ClusterManager manager(storage);
+    manager.add_node(cluster::NodeInfo{"node1", {"127.0.0.1", 9001}});
+    manager.add_node(cluster::NodeInfo{"node2", {"127.0.0.1", 9002}});
+
+    manager.remove_node("node1");
+
+    EXPECT_EQ(manager.resolve_owner("app", "users", 7), "node2");
+    EXPECT_EQ(storage.load_shard_registry().owner_of("app", "users", 7), "node2");
+    EXPECT_FALSE(std::filesystem::exists(source));
+    EXPECT_TRUE(std::filesystem::exists(storage.shard_path("node2", "app", "users", 7) / "rows.tbl"));
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST(ClusterManager, MigratesRegisteredShardFilesWhenNewNodeBecomesOwner) {
+    const auto dir = temp_cluster_dir("add_migrates_registered_shard");
+    cluster::ClusterStateStorage storage(dir);
+
+    const cluster::NodeInfo node1{"node1", {"127.0.0.1", 9001}};
+    const cluster::NodeInfo node2{"node2", {"127.0.0.1", 9002}};
+
+    cluster::ConsistentHashRing two_node_ring;
+    two_node_ring.rebuild({node1, node2}, 128);
+
+    cluster::ShardId shard = 0;
+    for (; shard < 128; ++shard) {
+        if (two_node_ring.locate(shard) == "node2") {
+            break;
+        }
+    }
+    ASSERT_LT(shard, 128u);
+
+    cluster::ShardRegistry registry;
+    registry.set_owner("app", "users", shard, "node1");
+    storage.save_shard_registry(registry);
+
+    const auto source = storage.shard_path("node1", "app", "users", shard);
+    std::filesystem::create_directories(source);
+    {
+        std::ofstream marker(source / "rows.tbl");
+        marker << "row payload\n";
+    }
+
+    cluster::ClusterManager manager(storage);
+    manager.add_node(node1);
+    manager.add_node(node2);
+
+    EXPECT_EQ(manager.resolve_owner("app", "users", shard), "node2");
+    EXPECT_EQ(storage.load_shard_registry().owner_of("app", "users", shard), "node2");
+    EXPECT_FALSE(std::filesystem::exists(source));
+    EXPECT_TRUE(std::filesystem::exists(storage.shard_path("node2", "app", "users", shard) / "rows.tbl"));
 
     std::filesystem::remove_all(dir);
 }
