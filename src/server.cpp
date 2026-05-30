@@ -1,27 +1,68 @@
 #include "async/task_manager.hpp"
 #include "crow.h"
+#include "auth/auth_service.hpp"
+#include "auth/file_account_storage.hpp"
+#include "auth/jwt_service.hpp"
+#include "auth/password_hasher.hpp"
 #include "core/dbms.hpp"
 #include "query/executor.hpp"
-#include "query/query_runner.hpp"
+#include "rbac/access_manager.hpp"
+#include "rbac/permission_resolver.hpp"
+#include "server/routes/admin_routes.hpp"
+#include "server/routes/auth_routes.hpp"
+#include "server/routes/metrics_routes.hpp"
+#include "server/routes/query_routes.hpp"
 #include "server/middleware/access_logger.hpp"
 #include "server/middleware/telemetry.hpp"
+#include "services/admin_service.hpp"
 #include "storage/storage_manager.hpp"
 #include <cerrno>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <nlohmann/json.hpp>
+#include <stdexcept>
 #include <string>
 
 namespace {
 
-crow::response json_response(const int status_code, const nlohmann::json& body) {
-    crow::response response(status_code, body.dump());
-    response.set_header("Content-Type", "application/json");
-    return response;
+std::string generate_jwt_secret(const auth::PasswordHasher &password_hasher) {
+    std::string secret;
+    for (int i = 0; i < 4; ++i) { // generate 512-bit secret
+        secret += password_hasher.generate_salt();
+    }
+    return secret;
+}
+
+std::string read_or_create_jwt_secret(const std::filesystem::path &data_dir,
+                                      const auth::PasswordHasher &password_hasher) {
+    std::filesystem::create_directories(data_dir);
+
+    const auto secret_path = data_dir / "jwt_secret";
+    if (std::filesystem::exists(secret_path)) {
+        std::ifstream in(secret_path);
+        if (!in) {
+            throw std::runtime_error("failed to open JWT secret file: " + secret_path.string());
+        }
+
+        std::string secret;
+        std::getline(in, secret);
+        if (secret.empty()) {
+            throw std::runtime_error("JWT secret file is empty: " + secret_path.string());
+        }
+        return secret;
+    }
+
+    const auto secret = generate_jwt_secret(password_hasher);
+    std::ofstream out(secret_path, std::ios::trunc);
+    if (!out) {
+        throw std::runtime_error("failed to create JWT secret file: " + secret_path.string());
+    }
+    out << secret << '\n';
+    return secret;
 }
 
 } // namespace
@@ -50,6 +91,14 @@ int main(const int argc, char **argv) {
 
     DBMS dbms;
     StorageManager storage(data_dir);
+    auth::FileAccountStorage account_storage(data_dir);
+    auth::PasswordHasher password_hasher;
+    auth::JwtService jwt(read_or_create_jwt_secret(data_dir, password_hasher));
+    auth::AuthService auth_service(account_storage, jwt, password_hasher);
+    rbac::PermissionResolver permission_resolver;
+    rbac::AccessManager access_manager(permission_resolver, account_storage);
+    services::AdminService admin_service(account_storage);
+
     storage.load(dbms);
     Executor exec(dbms);
     std::mutex mtx;
@@ -62,71 +111,13 @@ int main(const int argc, char **argv) {
         return 1;
     }
     auto telemetry = std::make_shared<TelemetryCollector>();
-    crow::App<AccessLogMiddleware> app(AccessLogMiddleware{access_logger, telemetry});
-    TaskManager tasks([&exec, &storage, &dbms, &mtx](const std::string& sql) {
-        std::lock_guard lock(mtx);
+    crow::App<AccessLogMiddleware, server::AuthMiddleware> app(AccessLogMiddleware{access_logger, telemetry},
+                                                               server::AuthMiddleware{auth_service});
 
-        try {
-            auto output = run_sql(sql, exec);
-            storage.save(dbms);
-            return output.empty() ? "OK" : output;
-        } catch (...) {
-            storage.save(dbms);
-            throw;
-        }
-    });
-
-    CROW_ROUTE(app, "/query").methods(crow::HTTPMethod::Post)(
-        [&tasks](const crow::request &req) {
-            const auto id = tasks.submit(req.body);
-
-            return json_response(
-                202,
-                {
-                    {"task_id", id},
-                    {"status", "pending"}
-                });
-        });
-
-    CROW_ROUTE(app, "/task/<string>").methods(crow::HTTPMethod::Get)(
-        [&tasks](const std::string& id) {
-            const auto task = tasks.get_task(id);
-
-            if (!task.has_value()) {
-                return json_response(
-                    404,
-                    {
-                        {"error", "task not found"},
-                        {"task_id", id}
-                    });
-            }
-
-            nlohmann::json body{
-                {"task_id", task->id},
-                {"status", task_status_to_string(task->status)}
-            };
-
-            if (task->status == TaskStatus::Done) {
-                body["result"] = task->result;
-            } else if (task->status == TaskStatus::Error) {
-                body["error"] = task->error;
-            }
-
-            return json_response(200, body);
-        });
-
-    CROW_ROUTE(app, "/metrics").methods(crow::HTTPMethod::Get)(
-        [telemetry]() {
-            crow::response response(telemetry->snapshot_json());
-            response.code = 200;
-            response.set_header("Content-Type", "application/json");
-            return response;
-        });
-    
-    CROW_ROUTE(app, "/heartbeat").methods(crow::HTTPMethod::Get)(
-        [] {
-            return crow::response(200, "OK");
-        });
+    server::register_auth_routes(app, auth_service);
+    server::register_admin_routes(app, admin_service, access_manager);
+    server::register_query_routes(app, exec, storage, dbms, mtx, access_manager);
+    server::register_metrics_routes(app, telemetry);
 
     std::cout << "dbms_server listening on port " << port
             << ", data dir: " << data_dir

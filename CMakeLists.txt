@@ -61,7 +61,9 @@ set(CORE_SOURCES
         src/storage/storage_manager.cpp
         src/core/stringpool.cpp
         src/async/task_manager.cpp
+        src/services/admin_service.cpp
         src/auth/auth_service.cpp
+        src/auth/file_account_storage.cpp
         src/auth/jwt_service.cpp
         src/auth/password_hasher.cpp
         src/rbac/access_manager.cpp
@@ -103,6 +105,9 @@ add_executable(dbms_server
         src/server/middleware/access_logger.cpp
         src/server/middleware/telemetry.cpp
         src/server/routes/auth_routes.cpp
+        src/server/routes/admin_routes.cpp
+        src/server/routes/query_routes.cpp
+        src/server/routes/metrics_routes.cpp
         src/server/middleware/auth_middleware.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
