@@ -41,7 +41,6 @@ include/
 │   └── access_manager.hpp
 │
 ├── services/
-│   ├── query_service.hpp
 │   └── admin_service.hpp
 │
 ├── server/
@@ -416,7 +415,7 @@ Policy evaluation
 ↓
 Authorization result
 ↓
-Route Handler / QueryService
+Route Handler
 ```
 
 ---

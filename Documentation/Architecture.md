@@ -45,9 +45,7 @@ include/
 │          └── result_merger.hpp
 │
 ├── services/
-│    ├── query_service.hpp
-│    ├── admin_service.hpp
-│    └── telemetry_service.hpp
+│    └── admin_service.hpp
 │
 ├── server/
 │    ├── middleware/
@@ -65,9 +63,7 @@ HTTP
  ↓
 Middleware
  ↓
-QueryService
- ↓
-QueryRouter
+Route Handler
  ↓
 DistributedExecutor
  ↓
