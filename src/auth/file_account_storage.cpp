@@ -235,7 +235,6 @@ FileAccountStorage::FileAccountStorage(std::filesystem::path data_dir)
     ensure_file(groups_path());
     ensure_file(user_groups_path());
     ensure_file(permissions_path());
-    ensure_file(roles_path());
 
     const auto default_policy = default_read_policy();
     const auto existing = policies();
@@ -462,10 +461,6 @@ std::filesystem::path FileAccountStorage::user_groups_path() const {
 
 std::filesystem::path FileAccountStorage::permissions_path() const {
     return data_dir_ / "permissions.tbl";
-}
-
-std::filesystem::path FileAccountStorage::roles_path() const {
-    return data_dir_ / "roles.tbl";
 }
 
 } // namespace auth

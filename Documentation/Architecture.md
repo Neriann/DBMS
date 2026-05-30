@@ -11,7 +11,6 @@ include/
 │
 ├── rbac/
 │    ├── permission.hpp
-│    ├── role.hpp
 │    ├── policy.hpp
 │    ├── access_manager.hpp
 │    ├── permission_resolver.hpp

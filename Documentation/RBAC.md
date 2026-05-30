@@ -35,7 +35,6 @@ include/
 │
 ├── rbac/
 │   ├── permission.hpp
-│   ├── role.hpp
 │   ├── group.hpp
 │   ├── policy.hpp
 │   ├── permission_resolver.hpp
@@ -216,23 +215,6 @@ enum class Permission {
 
 ---
 
-## role.hpp
-
-Defines RBAC roles.
-
-A role represents a reusable collection of permissions.
-
-Example roles:
-
-```text
-Admin
-ReadOnly
-Writer
-Operator
-```
-
----
-
 ## group.hpp
 
 Defines:
@@ -340,8 +322,7 @@ The AccessManager does not:
 ├── users.tbl
 ├── groups.tbl
 ├── user_groups.tbl
-├── permissions.tbl
-└── roles.tbl
+└── permissions.tbl
 ```
 
 ---
@@ -406,19 +387,6 @@ database_name
 table_name
 permission
 allowed
-```
-
----
-
-## roles.tbl
-
-Stores reusable predefined roles.
-
-Schema:
-
-```text
-role_name
-permissions
 ```
 
 ---
@@ -509,24 +477,6 @@ GrantPermissions
 
 ---
 
-# Example Role Mapping
-
-```text
-Admin:
-    full access
-
-ReadOnly:
-    SELECT only
-
-Writer:
-    SELECT + INSERT + UPDATE
-
-Operator:
-    cluster monitoring + telemetry
-```
-
----
-
 # API
 
 Administrative endpoints are protected by RBAC.
@@ -568,7 +518,6 @@ The system guarantees:
 Potential future extensions:
 
 ```text
-- hierarchical roles
 - deny-overrides policy model
 - distributed permission cache
 - token revocation lists

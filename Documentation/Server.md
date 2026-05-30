@@ -43,7 +43,6 @@ Important files:
 ./data/groups.tbl
 ./data/user_groups.tbl
 ./data/permissions.tbl
-./data/roles.tbl
 ./data/jwt_secret
 ./data/access.log
 ```
