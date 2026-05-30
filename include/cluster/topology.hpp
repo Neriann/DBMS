@@ -19,6 +19,7 @@ public:
     [[nodiscard]] const std::vector<NodeInfo> &nodes() const;
     [[nodiscard]] const std::vector<NodeState> &states() const;
     [[nodiscard]] const ClusterConfig &config() const;
+    [[nodiscard]] const NodeInfo *find_node(const NodeId &node_id) const;
 
 private:
     ClusterConfig config_;
