@@ -441,3 +441,50 @@ Potential future features:
 - asynchronous rebalancing,
 - distributed WAL,
 - replica synchronization.
+
+---
+
+# Current Entrypoint API
+
+The current implementation starts the balancer as:
+
+```text
+entrypointer [port] [data_dir]
+```
+
+Default values:
+- `port = 8080`
+- `data_dir = ./data/entrypoint`
+
+Storage nodes are regular `dbms_server` processes:
+
+```text
+dbms_server [port] [data_dir]
+```
+
+Storage nodes can be added and removed without restarting Entrypoint:
+
+```http
+POST /nodes
+Content-Type: application/json
+
+{"id":"node1","host":"127.0.0.1","port":9001}
+```
+
+```http
+DELETE /nodes/node1
+```
+
+```http
+GET /nodes
+```
+
+`POST /query` on Entrypoint forwards the original SQL request to Storage nodes.
+Requests with an extractable shard key (`id`) are routed to one Storage node.
+Requests without an extractable shard key are executed as scatter-gather.
+
+Current implementation limits:
+- `replication_factor = 1`
+- adding/removing nodes rebuilds routing for new requests
+- already persisted shard data is not migrated during rebalancing yet
+- multi-row `INSERT` is routed by the first row's `id`
