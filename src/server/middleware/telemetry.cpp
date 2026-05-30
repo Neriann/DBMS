@@ -1,4 +1,4 @@
-#include "server/telemetry.hpp"
+#include "server/middleware/telemetry.hpp"
 
 #include <algorithm>
 #include <nlohmann/json.hpp>

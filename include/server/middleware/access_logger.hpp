@@ -1,7 +1,7 @@
 #pragma once
 
 #include "crow.h"
-#include "server/telemetry.hpp"
+#include "server/middleware/telemetry.hpp"
 
 #include <chrono>
 #include <filesystem>

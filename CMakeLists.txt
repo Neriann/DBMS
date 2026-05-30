@@ -7,16 +7,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(FLEX 2.6 REQUIRED)
 find_package(BISON 3.0 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS container date_time)
+find_package(OpenSSL REQUIRED)
 
 include(FetchContent)
 
-set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-set(JSON_Install OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
-        nlohmann_json
-        GIT_REPOSITORY https://github.com/nlohmann/json
-        GIT_TAG v3.12.0
-        GIT_SHALLOW TRUE
+        jwt-cpp
+        GIT_REPOSITORY https://github.com/Thalhammer/jwt-cpp.git
+        GIT_TAG v0.7.0
 )
 
 set(CROW_USE_BOOST ON)
@@ -30,7 +28,7 @@ FetchContent_Declare(
         GIT_SHALLOW TRUE
 )
 
-FetchContent_MakeAvailable(nlohmann_json Crow)
+FetchContent_MakeAvailable(jwt-cpp Crow)
 
 add_library(dbms_b_star_plus_tree INTERFACE)
 target_include_directories(dbms_b_star_plus_tree
@@ -63,6 +61,13 @@ set(CORE_SOURCES
         src/storage/storage_manager.cpp
         src/core/stringpool.cpp
         src/async/task_manager.cpp
+        src/services/admin_service.cpp
+        src/auth/auth_service.cpp
+        src/auth/file_account_storage.cpp
+        src/auth/jwt_service.cpp
+        src/auth/password_hasher.cpp
+        src/rbac/access_manager.cpp
+        src/rbac/permission_resolver.cpp
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )
@@ -78,7 +83,9 @@ endif ()
 set(CORE_LIBS
         dbms_b_star_plus_tree
         Boost::container
-        nlohmann_json::nlohmann_json)
+        nlohmann_json::nlohmann_json
+        jwt-cpp::jwt-cpp
+        OpenSSL::Crypto)
 
 add_library(dbms_core ${CORE_SOURCES})
 target_include_directories(dbms_core
@@ -95,8 +102,13 @@ target_link_libraries(dbms PRIVATE dbms_core)
 # HTTP server
 add_executable(dbms_server
         src/server.cpp
-        src/server/access_logger.cpp
-        src/server/telemetry.cpp)
+        src/server/middleware/access_logger.cpp
+        src/server/middleware/telemetry.cpp
+        src/server/routes/auth_routes.cpp
+        src/server/routes/admin_routes.cpp
+        src/server/routes/query_routes.cpp
+        src/server/routes/metrics_routes.cpp
+        src/server/middleware/auth_middleware.cpp)
 target_link_libraries(dbms_server PRIVATE dbms_core Crow::Crow)
 
 
