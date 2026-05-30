@@ -17,7 +17,7 @@ struct NodeEndpoint {
 };
 
 struct ClusterConfig {
-    std::uint32_t shard_count = 128;
+    std::uint32_t shard_count = 4096;
     std::uint32_t replication_factor = 1;
 };
 

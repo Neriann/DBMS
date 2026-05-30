@@ -138,7 +138,7 @@ TEST(ClusterManager, ComputesShardIdWithinValidRange) {
     cluster::ClusterManager manager(storage);
 
     constexpr std::size_t sample_count = 10000;
-    constexpr std::size_t shard_count = 128;
+    constexpr std::size_t shard_count = 4096;
 
     for (std::size_t i = 0; i < sample_count; ++i) {
         const auto shard_key = std::to_string(i);

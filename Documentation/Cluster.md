@@ -404,7 +404,7 @@ Contains global cluster configuration.
 
 ```json
 {
-    "shard_count": 128,
+    "shard_count": 4096,
     "replication_factor": 1
 }
 ```
