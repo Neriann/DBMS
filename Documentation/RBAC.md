@@ -527,36 +527,26 @@ Operator:
 
 ---
 
-# Admin API
+# API
 
 Administrative endpoints are protected by RBAC.
 
 Example endpoints:
 
 ```text
-POST   /users/create
-DELETE /users/{id}
-
-POST   /groups/create
-POST   /groups/add_user
-
-POST   /permissions/grant
-POST   /permissions/revoke
-```
-
----
-
-# User API
-
-Example user endpoints:
-
-```text
+# Auth
 POST /login
 POST /register
 
+# User query API
 POST /query
-POST /db/create
-POST /table/create
+
+# Admin API
+POST   /admin/groups
+POST   /admin/groups/{group_id}/users
+
+POST   /admin/permissions/grant
+POST   /admin/permissions/revoke
 ```
 
 ---
