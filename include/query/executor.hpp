@@ -10,9 +10,10 @@ public:
     explicit Executor(DBMS &dbms);
 
     /**
+     * Dispatches a parsed statement to the corresponding executor method.
      *
-     * @param stmt Statement
-     * @return JSON result string after dispatch parsed statement to appropriate handle
+     * @param stmt parsed statement
+     * @return JSON result string; empty string if the statement has no user-visible output
      */
     std::string execute(const Statement &stmt);
 

@@ -67,6 +67,10 @@ enum class ConditionKind {
 
 struct Condition;
 
+/**
+ * WHERE condition tree. Leaf nodes store predicate/between/like payloads;
+ * And/Or nodes reference their left and right child conditions.
+ */
 struct Condition {
     ConditionKind kind;
     std::optional<Predicate> predicate;
@@ -92,6 +96,10 @@ struct UseStmt {
     std::string db_name;
 };
 
+/**
+ * Column modifiers collected by the parser before a Column object is built.
+ * default_value is schema metadata and is applied only when INSERT omits the column.
+ */
 struct ColumnAttributes {
     std::uint8_t constraints = NONE;
     std::optional<Value> default_value;
@@ -114,11 +122,19 @@ enum class AggregateFunction {
     Avg
 };
 
+/**
+ * A regular SELECT projection item: column name with an optional output alias.
+ */
 struct SelectColumn {
     std::string name;
     std::string alias;
 };
 
+/**
+ * Aggregate SELECT item.
+ * COUNT(*) is represented by function == Count and count_star == true;
+ * SUM/AVG/COUNT(column) use column and may have an alias.
+ */
 struct AggregateCall {
     AggregateFunction function;
     std::string column;
@@ -126,6 +142,9 @@ struct AggregateCall {
     std::string alias;
 };
 
+/**
+ * SELECT item is either a plain column projection or an aggregate call.
+ */
 using SelectItem = std::variant<SelectColumn, AggregateCall>;
 
 struct InsertStmt {
