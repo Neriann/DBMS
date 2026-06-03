@@ -10,7 +10,7 @@ CREATE TABLE users (
     note STRING DEFAULT NULL
 );
 
-INSERT INTO users (id, name, age, city, act, note) VALUE
+INSERT INTO users (id, name, age, city, active, note) VALUE
     (1, "Ann", 20, "Moscow", 1, "admin"),
     (2, "Bob", 25, "Berlin", 1, NULL),
     (3, "Alice", 30, "Amsterdam", 0, "guest"),
