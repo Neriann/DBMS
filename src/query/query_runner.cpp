@@ -15,7 +15,7 @@ std::vector<Statement> parse_sql(const std::string &sql) {
     return stmts;
 }
 
-std::string run_statements(const std::vector<Statement> &statements, Executor &exec) {
+std::string run_statements(const std::vector<Statement> &statements, const Executor &exec) {
     std::string output;
 
     for (const Statement &stmt: statements) {
@@ -28,6 +28,6 @@ std::string run_statements(const std::vector<Statement> &statements, Executor &e
     return output;
 }
 
-std::string run_sql(const std::string &sql, Executor &exec) {
+std::string run_sql(const std::string &sql, const Executor &exec) {
     return run_statements(parse_sql(sql), exec);
 }

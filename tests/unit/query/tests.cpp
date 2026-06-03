@@ -483,7 +483,7 @@ TEST(QueryExecutor, HandlesEscapedStringLiterals) {
         "SELECT * FROM texts;");
 
     ASSERT_EQ(results.size(), 5);
-    expect_json_eq(results.back(), "[{\"value\":\"line\\nquote\\\"slash\\\\\"}]");
+    expect_json_eq(results.back(), R"([{"value":"line\nquote\"slash\\"}])");
 }
 
 TEST(QueryExecutor, AcceptsLowercaseKeywordsAndCommentsEndToEnd) {
@@ -704,7 +704,7 @@ TEST(QueryExecutor, SupportsEscapedTabAndCarriageReturn) {
         "SELECT * FROM texts;");
 
     ASSERT_EQ(results.size(), 5);
-    expect_json_eq(results.back(), "[{\"s\":\"a\\tb\\r\"}]");
+    expect_json_eq(results.back(), R"([{"s":"a\tb\r"}])");
 }
 
 TEST(QueryExecutor, SupportsNegativeIntegerLiteralsInInsert) {

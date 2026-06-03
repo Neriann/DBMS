@@ -19,7 +19,7 @@ std::vector<Statement> parse_sql(const std::string &sql);
  * @param exec executor bound to a DBMS instance
  * @return concatenated non-empty statement results separated by newlines
  */
-std::string run_statements(const std::vector<Statement> &statements, Executor &exec);
+std::string run_statements(const std::vector<Statement> &statements, const Executor &exec);
 
 /**
  * Parses and executes SQL source text.
@@ -28,4 +28,4 @@ std::string run_statements(const std::vector<Statement> &statements, Executor &e
  * @param exec executor bound to a DBMS instance
  * @return concatenated non-empty statement results separated by newlines
  */
-std::string run_sql(const std::string &sql, Executor &exec);
+std::string run_sql(const std::string &sql, const Executor &exec);

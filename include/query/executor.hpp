@@ -15,7 +15,7 @@ public:
      * @param stmt parsed statement
      * @return JSON result string; empty string if the statement has no user-visible output
      */
-    std::string execute(const Statement &stmt);
+    [[nodiscard]] std::string execute(const Statement &stmt) const;
 
 private:
     DBMS &dbms_;
@@ -24,61 +24,61 @@ private:
      * @param s CreateDatabaseStmt
      * @return JSON confirmation string
      */
-    std::string exec_create_database(const CreateDatabaseStmt &s) const;
+    [[nodiscard]] std::string exec_create_database(const CreateDatabaseStmt &s) const;
 
     /**
      * @param s DropDatabaseStmt
      * @return JSON confirmation string
      */
-    std::string exec_drop_database(const DropDatabaseStmt &s) const;
+    [[nodiscard]] std::string exec_drop_database(const DropDatabaseStmt &s) const;
 
     /**
      * @param s UseStmt
      * @return JSON confirmation string
      */
-    std::string exec_use(const UseStmt &s) const;
+    [[nodiscard]] std::string exec_use(const UseStmt &s) const;
 
     /**
      * @param s CreateTableStmt
      * @return JSON confirmation string
      */
-    std::string exec_create_table(const CreateTableStmt &s);
+    [[nodiscard]] std::string exec_create_table(const CreateTableStmt &s) const;
 
     /**
      * @param s DropTableStmt
      * @return JSON confirmation string
      */
-    std::string exec_drop_table(const DropTableStmt &s);
+    [[nodiscard]] std::string exec_drop_table(const DropTableStmt &s) const;
 
     /**
      * @param s InsertStmt
      * @return JSON confirmation string with number of inserted rows
      */
-    std::string exec_insert(const InsertStmt &s);
+    [[nodiscard]] std::string exec_insert(const InsertStmt &s) const;
 
     /**
      * @param s UpdateStmt
      * @return JSON confirmation string with number of updated rows
      */
-    std::string exec_update(const UpdateStmt &s);
+    [[nodiscard]] std::string exec_update(const UpdateStmt &s) const;
 
     /**
      * @param s DeleteStmt
      * @return JSON confirmation string with number of deleted rows
      */
-    std::string exec_delete(const DeleteStmt &s);
+    [[nodiscard]] std::string exec_delete(const DeleteStmt &s) const;
 
     /**
      * @param s SelectStmt
      * @return JSON array of matching rows
      */
-    std::string exec_select(const SelectStmt &s);
+    [[nodiscard]] std::string exec_select(const SelectStmt &s) const;
 
     /**
      * @param s RevertStmt
      * @return JSON confirmation string
      */
-    std::string exec_revert(const RevertStmt &s);
+    [[nodiscard]] std::string exec_revert(const RevertStmt &s) const;
 
     //region helpers
 
@@ -87,7 +87,7 @@ private:
      * @return reference to the Database object
      * @throws std::runtime_error if the database does not exist
      */
-    Database &resolve_db(const std::string &db_name);
+    [[nodiscard]] Database &resolve_db(const std::string &db_name) const;
 
     /**
      * @param db_name database name
@@ -95,7 +95,7 @@ private:
      * @return reference to the Table object
      * @throws std::runtime_error if the database or table does not exist
      */
-    Table &resolve_table(const std::string &db_name, const std::string &table_name);
+    [[nodiscard]] Table &resolve_table(const std::string &db_name, const std::string &table_name) const;
 
     /**
      * @param cond condition tree to evaluate
