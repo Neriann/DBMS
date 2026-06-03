@@ -1,13 +1,11 @@
 #include "core/dbms.hpp"
-#include "query/scanner.hpp"
-#include "parser.hpp"
 #include "query/executor.hpp"
+#include "query/query_runner.hpp"
 #include "../storage/value_test_utils.hpp"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -15,15 +13,6 @@
 #include <vector>
 
 namespace {
-
-std::vector<Statement> parse_sql(const std::string &sql) {
-    std::istringstream input(sql);
-    Scanner scanner(input);
-    std::vector<Statement> statements;
-    yy::Parser parser(scanner, statements);
-    parser.parse();
-    return statements;
-}
 
 std::vector<std::string> execute_sql(DBMS &dbms, const std::string &sql) {
     Executor executor(dbms);
