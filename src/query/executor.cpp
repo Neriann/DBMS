@@ -210,8 +210,8 @@ ExprType infer_expr_type(
             if (!expr.operand) {
                 throw std::runtime_error("Malformed unary minus expression");
             }
-            const ExprType operand_type = infer_expr_type(*expr.operand, schema, column_indexes);
-            if (operand_type != ExprType::Int) {
+            if (const ExprType operand_type = infer_expr_type(*expr.operand, schema, column_indexes);
+                operand_type != ExprType::Int) {
                 throw std::runtime_error("Unary minus expects an INT expression");
             }
             return ExprType::Int;
@@ -235,9 +235,9 @@ void validate_literal_regex(const Expr &expr) {
         return;
     }
 
-    const InternedString pattern = std::get<InternedString>(expr.literal);
+    const auto [id] = std::get<InternedString>(expr.literal);
     try {
-        const std::regex compiled(global_string_pool().get(pattern.id));
+        const std::regex compiled(global_string_pool().get(id));
     } catch (const std::regex_error &) {
         throw std::runtime_error("Invalid LIKE regex pattern");
     }
@@ -280,8 +280,8 @@ void validate_condition_semantics(
             }
 
             const ExprType lhs = infer_expr_type(condition.like->lhs, schema, column_indexes);
-            const ExprType rhs = infer_expr_type(condition.like->rhs, schema, column_indexes);
-            if (lhs != ExprType::String || rhs != ExprType::String) {
+            if (const ExprType rhs = infer_expr_type(condition.like->rhs, schema, column_indexes);
+                lhs != ExprType::String || rhs != ExprType::String) {
                 throw std::runtime_error("LIKE expects STRING operands");
             }
             validate_literal_regex(condition.like->rhs);
@@ -432,7 +432,7 @@ nlohmann::json eval_aggregate(
     }
 
     const int column_index = require_column(column_indexes, aggregate.column);
-    const std::size_t index = static_cast<std::size_t>(column_index);
+    const auto index = static_cast<std::size_t>(column_index);
 
     if (aggregate.function == AggregateFunction::Count) {
         std::size_t count = 0;
@@ -560,8 +560,8 @@ std::optional<std::vector<RowID>> indexed_simple_candidates(
         return table.find_indexed(*column, *value);
     }
 
-    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
-    if (op == CmpOp::NEQ || !type || !value_matches_column_type(*value, *type)) {
+    if (const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+        op == CmpOp::NEQ || !type || !value_matches_column_type(*value, *type)) {
         return std::nullopt;
     }
 
@@ -591,8 +591,8 @@ std::optional<std::vector<RowID>> indexed_between_candidates(
         return std::nullopt;
     }
 
-    const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
-    if (!type || !value_matches_column_type(*lower, *type) || !value_matches_column_type(*upper, *type)) {
+    if (const std::optional<ColumnType> type = lookup_column_type(schema, column_indexes, *column);
+        !type || !value_matches_column_type(*lower, *type) || !value_matches_column_type(*upper, *type)) {
         return std::nullopt;
     }
 
@@ -654,8 +654,8 @@ std::optional<std::vector<RowID>> indexed_condition_candidates(
                 throw std::runtime_error("Malformed OR condition");
             }
             auto left = indexed_condition_candidates(table, schema, column_indexes, *condition.left);
-            auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
-            if (left && right) {
+            if (auto right = indexed_condition_candidates(table, schema, column_indexes, *condition.right);
+                left && right) {
                 return union_row_ids(std::move(*left), std::move(*right));
             }
             return std::nullopt;
@@ -694,7 +694,7 @@ Executor::Executor(DBMS &dbms) : dbms_(dbms) {
 
 // region Statement Dispatch
 
-std::string Executor::execute(const Statement &stmt) {
+std::string Executor::execute(const Statement &stmt) const {
     return std::visit(
         Overloaded{
             [this](const CreateDatabaseStmt &s) { return exec_create_database(s); },
@@ -715,7 +715,7 @@ std::string Executor::execute(const Statement &stmt) {
 
 // region Resolution Helpers
 
-Database &Executor::resolve_db(const std::string &db_name) {
+Database &Executor::resolve_db(const std::string &db_name) const {
     if (!db_name.empty()) {
         return dbms_.get_database(db_name);
     }
@@ -727,7 +727,7 @@ Database &Executor::resolve_db(const std::string &db_name) {
     return *current;
 }
 
-Table &Executor::resolve_table(const std::string &db_name, const std::string &table_name) {
+Table &Executor::resolve_table(const std::string &db_name, const std::string &table_name) const {
     return resolve_db(db_name).get_table(table_name);
 }
 
@@ -754,7 +754,7 @@ std::string Executor::exec_use(const UseStmt &s) const {
 
 // region Table Statement Executors
 
-std::string Executor::exec_create_table(const CreateTableStmt &s) {
+std::string Executor::exec_create_table(const CreateTableStmt &s) const {
     Database &db = resolve_db(s.db_name);
     std::set<std::string> names;
     for (const Column &column : s.schema) {
@@ -772,7 +772,7 @@ std::string Executor::exec_create_table(const CreateTableStmt &s) {
     return ok_json("Table '" + s.table_name + "' created").dump();
 }
 
-std::string Executor::exec_drop_table(const DropTableStmt &s) {
+std::string Executor::exec_drop_table(const DropTableStmt &s) const {
     resolve_db(s.db_name).drop_table(s.table_name);
     return ok_json("Table '" + s.table_name + "' dropped").dump();
 }
@@ -781,7 +781,7 @@ std::string Executor::exec_drop_table(const DropTableStmt &s) {
 
 // region Row Statement Executors
 
-std::string Executor::exec_insert(const InsertStmt &s) {
+std::string Executor::exec_insert(const InsertStmt &s) const {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> schema_indexes = build_column_index_map(schema);
@@ -823,7 +823,7 @@ std::string Executor::exec_insert(const InsertStmt &s) {
     return count_json("insert", inserted).dump();
 }
 
-std::string Executor::exec_update(const UpdateStmt &s) {
+std::string Executor::exec_update(const UpdateStmt &s) const {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
@@ -837,7 +837,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
         seen.insert(column);
         const int column_index = require_column(column_indexes, column);
         validate_assignment_semantics(schema[static_cast<std::size_t>(column_index)], expr, schema, column_indexes);
-        assignments.push_back({column_index, expr});
+        assignments.emplace_back(column_index, expr);
     }
     validate_optional_condition(s.where, schema, column_indexes);
 
@@ -861,7 +861,7 @@ std::string Executor::exec_update(const UpdateStmt &s) {
     return count_json("update", updated).dump();
 }
 
-std::string Executor::exec_delete(const DeleteStmt &s) {
+std::string Executor::exec_delete(const DeleteStmt &s) const {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
@@ -884,7 +884,7 @@ std::string Executor::exec_delete(const DeleteStmt &s) {
     return count_json("delete", matching_ids.size()).dump();
 }
 
-std::string Executor::exec_select(const SelectStmt &s) {
+std::string Executor::exec_select(const SelectStmt &s) const {
     Table &table = resolve_table(s.db_name, s.table_name);
     const Schema &schema = table.schema();
     const std::unordered_map<std::string, int> column_indexes = build_column_index_map(schema);
@@ -946,8 +946,8 @@ std::string Executor::exec_select(const SelectStmt &s) {
         selected_indexes.reserve(s.items.size());
         output_names.reserve(s.items.size());
         for (const SelectItem &item : s.items) {
-            const SelectColumn &column = std::get<SelectColumn>(item);
-            selected_indexes.push_back(require_column(column_indexes, column.name));
+            const auto &[name, alias] = std::get<SelectColumn>(item);
+            selected_indexes.push_back(require_column(column_indexes, name));
             output_names.push_back(select_item_output_name(item));
         }
     }
@@ -968,7 +968,7 @@ std::string Executor::exec_select(const SelectStmt &s) {
     return rows_to_json(rows, output_names);
 }
 
-std::string Executor::exec_revert(const RevertStmt &s) {
+std::string Executor::exec_revert(const RevertStmt &s) const {
     Table &table = resolve_table(s.db_name, s.table_name);
     const std::size_t changed = table.revert_to(parse_timestamp_ms(s.timestamp));
     return count_json("revert", changed).dump();
