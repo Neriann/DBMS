@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            build_type: Release
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+
+    env:
+      BUILD_DIR: build/${{ matrix.compiler }}-${{ matrix.build_type }}
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            bison \
+            flex \
+            libboost-all-dev \
+            libfl-dev \
+            libssl-dev \
+            ninja-build
+
+      - name: Configure
+        run: >
+          cmake -S . -B "$BUILD_DIR"
+          -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+      - name: Build
+        run: cmake --build "$BUILD_DIR" --parallel
+
+      - name: Test
+        run: >
+          ctest --test-dir "$BUILD_DIR"
+          --output-on-failure
+          --output-junit "$BUILD_DIR/ctest-results.xml"
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-report-${{ github.sha }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: ${{ env.BUILD_DIR }}/ctest-results.xml
+          if-no-files-found: ignore
+
+      - name: Upload binaries
+        if: matrix.build_type == 'Release' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: dbms-${{ github.sha }}-${{ matrix.compiler }}-${{ runner.os }}
+          path: |
+            ${{ env.BUILD_DIR }}/dbms
+            ${{ env.BUILD_DIR }}/dbms_server
+            ${{ env.BUILD_DIR }}/dbms_client
+            ${{ env.BUILD_DIR }}/entrypointer
+          if-no-files-found: error
