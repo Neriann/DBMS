@@ -29,9 +29,9 @@ jobs:
             cc: clang
             cxx: clang++
             build_type: Release
-          - compiler: gcc
-            cc: gcc
-            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
             build_type: Debug
 
     env:
