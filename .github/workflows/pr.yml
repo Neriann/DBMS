@@ -1,6 +1,13 @@
 name: Lint Commit Messages
 
-on: [pull_request]
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: commitlint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -16,4 +23,4 @@ jobs:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: commitlint.config.json
+          configFile: commitlint.config.js
